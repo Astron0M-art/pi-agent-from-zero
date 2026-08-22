@@ -1,5 +1,7 @@
 # Pi Agent from Zero
 
+[简体中文](README.md) | [English](README_EN.md)
+
 一个中文优先、源码对照、可运行的本地 Coding Agent 教学项目。
 
 本项目从约 100 行 Python Agent 出发，以两天一个教学版本的节奏，逐步加入流式事件、工具系统、TUI、权限控制、会话恢复、MCP、Skills、扩展机制、Trace 回放与评测。
@@ -40,6 +42,10 @@
 
 完整计划见 [ROADMAP.md](ROADMAP.md)，每个版本的交付标准见 [docs/teaching-contract.md](docs/teaching-contract.md)。
 
+## 面向中文世界
+
+中文是本项目的主要教学语言和内容事实源。公共 API、代码标识符与协议字段保持英文，Issue 和 Pull Request 同时接受中文与英文。详细约定见 [语言策略](docs/language-policy.md)。
+
 ## 仓库结构
 
 ```text
@@ -72,6 +78,10 @@ pytest
 - 行为准则：[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
 - 安全问题：[SECURITY.md](SECURITY.md)
 - 上游基线：[docs/upstream-baseline.md](docs/upstream-baseline.md)
+
+## 作者与维护者
+
+- [Astron_ma](https://github.com/Astron0M-art)（GitHub：`Astron0M-art`）
 
 ## License
 

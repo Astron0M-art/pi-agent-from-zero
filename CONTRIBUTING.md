@@ -1,5 +1,7 @@
 # Contributing
 
+本项目中文优先，同时接受中文或英文 Issue、Discussion 和 Pull Request。代码标识符、公开 API 与协议字段使用英文；面向学习者的核心讲义以中文为事实源。参见 [语言策略](docs/language-policy.md)。
+
 ## Contribution types
 
 - 修正代码、测试或讲义中的错误
