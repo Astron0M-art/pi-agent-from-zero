@@ -1,0 +1,26 @@
+name: Lesson feedback
+description: Report a confusing explanation, missing step, or incorrect source mapping.
+title: "[Lesson]: "
+labels: [documentation]
+body:
+  - type: input
+    id: lesson
+    attributes:
+      label: Lesson
+      placeholder: 01-minimal-agent
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Confusing statement or missing step
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Pi source evidence or learner feedback
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested correction
