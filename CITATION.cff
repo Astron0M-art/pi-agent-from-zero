@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this teaching project, please cite it using this metadata."
+title: "Pi Agent from Zero"
+type: software
+authors:
+  - family-names: "Astron_ma"
+    alias: "Astron0M-art"
+repository-code: "https://github.com/Astron0M-art/pi-agent-from-zero"
+url: "https://github.com/Astron0M-art/pi-agent-from-zero"
+license: MIT
