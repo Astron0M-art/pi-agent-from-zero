@@ -1,0 +1,9 @@
+这是人工可读的教学轨迹，不是 v0.14.0 的结构化 Trace 协议。
+
+1. user: 告诉我当前目录
+2. assistant: text="我先确认当前工作目录。", bash_command="pwd"
+3. approval: allowed=true
+4. tool(bash): /path/to/pi-agent-from-zero
+5. assistant: 任务演示完成，bash 返回：/path/to/pi-agent-from-zero
+
+完成证据是第 4 步真实 Bash 输出，不是第 5 步的模型自报。

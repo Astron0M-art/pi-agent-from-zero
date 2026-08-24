@@ -10,7 +10,21 @@
 
 ## 项目状态
 
-当前处于仓库初始化阶段。第一个可运行教学版本将从 `v0.1.0` 开始。
+当前版本：[`v0.1.0` 约 100 行最小 Agent](lessons/01-minimal-agent/README.md)。它已经具备单模型、单 Bash 工具、执行前审批、工具结果回填和循环预算，可以完全离线运行与测试。
+
+## 5 分钟跑通第一版
+
+无需 API Key。在仓库根目录执行：
+
+```bash
+python lessons/01-minimal-agent/snapshot/agent.py "告诉我当前目录"
+```
+
+看到 `pwd` 审批提示后输入 `y`。如果想验证拒绝路径，再运行一次并输入 `n`。冻结快照的独立测试：
+
+```bash
+python -m unittest discover -s lessons/01-minimal-agent/tests -v
+```
 
 ## 教学原则
 
@@ -70,6 +84,7 @@ ruff format --check .
 ruff check .
 mypy src
 pytest
+python -m build
 ```
 
 ## 开源协作

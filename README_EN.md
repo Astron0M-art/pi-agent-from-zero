@@ -10,7 +10,18 @@ The project starts with an approximately 100-line Python agent and evolves on a 
 
 ## Status
 
-The repository is currently being prepared for its first runnable teaching release, `v0.1.0`.
+Current release: [`v0.1.0`, the approximately 100-line minimal agent](lessons/01-minimal-agent/README.md). It provides one model, one approval-gated Bash tool, tool-result feedback, and a turn budget, with fully offline tests.
+
+## Run the first release
+
+No API key is required:
+
+```bash
+python lessons/01-minimal-agent/snapshot/agent.py "show my current directory"
+python -m unittest discover -s lessons/01-minimal-agent/tests -v
+```
+
+The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.
 
 ## Teaching principles
 
@@ -71,6 +82,7 @@ ruff format --check .
 ruff check .
 mypy src
 pytest
+python -m build
 ```
 
 ## Open source collaboration
