@@ -1,0 +1,11 @@
+这是人工可读教学轨迹，不是 v0.14.0 的结构化 Trace。
+
+1. Agent.messages = (UserMessage("告诉我当前目录"),)
+2. FakeModel.complete(ModelRequest(model="fake-scripted", available_tools=("bash",), ...))
+3. AssistantMessage(tool_calls=(ToolCall(id="call-1", name="bash", ...),))
+4. approval("pwd") = true
+5. ToolResultMessage(tool_call_id="call-1", tool_name="bash", content="/path", is_error=false)
+6. FakeModel.complete() 收到包含第 5 步的新 ModelRequest
+7. AssistantMessage(content="任务演示完成……")
+
+第 5 步的 ID 关联和真实输出是完成证据；第 7 步只负责向用户表达结果。

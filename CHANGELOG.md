@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-25
+
+### Added
+
+- 增加统一 `Message` 联合类型：User、Assistant、ToolResult 与结构化 ToolCall。
+- 增加 `Provider.complete(ModelRequest)` 边界和可脚本化、可记录请求的离线 FakeModel。
+- 增加 `02-message-provider` 独立冻结快照、架构讲义、Pi 源码映射、Provider Adapter 实验与故障注入。
+- 增加消息不可变、请求适配、调用 ID 关联、未知工具与脚本耗尽测试。
+
+### Changed
+
+- 当前 Agent 从字符串字典 history 演进为类型化模型上下文，并通过 Provider 获取 AssistantMessage。
+- CLI 演示和包公开 API 更新到 v0.2.0，v0.1.0 继续由冻结快照保留。
+
 ## [0.1.0] - 2026-08-24
 
 ### Added
@@ -29,6 +43,7 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.1.0
 [0.0.0]: https://github.com/Astron0M-art/pi-agent-from-zero/commits/5d06d3a917ed2f304722eb6ce3176f35c1ca1b93
