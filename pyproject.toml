@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pi-agent-from-zero"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Chinese-first, source-grounded coding agent course inspired by Pi"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,7 +25,7 @@ classifiers = [
 dependencies = []
 
 [project.scripts]
-pi-agent-zero = "pi_agent_from_zero.minimal_agent:main"
+pi-agent-zero = "pi_agent_from_zero.agent:main"
 
 [project.optional-dependencies]
 dev = [

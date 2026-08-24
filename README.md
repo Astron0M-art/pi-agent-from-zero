@@ -10,21 +10,23 @@
 
 ## 项目状态
 
-当前版本：[`v0.1.0` 约 100 行最小 Agent](lessons/01-minimal-agent/README.md)。它已经具备单模型、单 Bash 工具、执行前审批、工具结果回填和循环预算，可以完全离线运行与测试。
+当前版本：[`v0.2.0` 消息与模型适配](lessons/02-message-provider/README.md)。在 v0.1.0 最小循环之上，新增统一 Message、Provider 接口和可脚本化 FakeModel，让 Agent 控制流不再依赖某家模型 SDK 或随手拼出的字典字段。
 
-## 5 分钟跑通第一版
+## 5 分钟跑通最新版本
 
 无需 API Key。在仓库根目录执行：
 
 ```bash
-python lessons/01-minimal-agent/snapshot/agent.py "告诉我当前目录"
+python lessons/02-message-provider/snapshot/agent.py "告诉我当前目录"
 ```
 
 看到 `pwd` 审批提示后输入 `y`。如果想验证拒绝路径，再运行一次并输入 `n`。冻结快照的独立测试：
 
 ```bash
-python -m unittest discover -s lessons/01-minimal-agent/tests -v
+python -m unittest discover -s lessons/02-message-provider/tests -v
 ```
+
+想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)；旧版本冻结快照不会被最新实现覆盖。
 
 ## 教学原则
 
