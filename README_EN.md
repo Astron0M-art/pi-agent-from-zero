@@ -10,15 +10,15 @@ The project starts with an approximately 100-line Python agent and evolves on a 
 
 ## Status
 
-Current release: [`v0.2.0`, messages and model adapters](lessons/02-message-provider/README.md). It adds a unified Message union, a Provider boundary, correlated tool results, and a scriptable FakeModel on top of the v0.1.0 minimal loop.
+Current release: [`v0.3.0`, streaming events and cancellation](lessons/03-streaming-cancellation/README.md). It adds incremental text, typed Agent lifecycle events, deadlines, and cooperative cancellation. Partial assistant output is rendered but never committed to model history.
 
 ## Run the latest release
 
 No API key is required:
 
 ```bash
-python lessons/02-message-provider/snapshot/agent.py "show my current directory"
-python -m unittest discover -s lessons/02-message-provider/tests -v
+python lessons/03-streaming-cancellation/snapshot/agent.py
+python -m unittest discover -s lessons/03-streaming-cancellation/tests -v
 ```
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.

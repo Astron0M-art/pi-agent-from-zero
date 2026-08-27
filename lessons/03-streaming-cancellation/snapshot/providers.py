@@ -1,4 +1,4 @@
-"""流式 Provider 边界与离线 FakeModel。"""
+"""可替换的流式 Provider 和完全离线的 FakeModel。"""
 
 from __future__ import annotations
 
@@ -6,14 +6,12 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from typing import Protocol, TypeAlias
 
-from pi_agent_from_zero.events import CancellationToken, ProviderEvent
-from pi_agent_from_zero.messages import Message
+from events import CancellationToken, ProviderEvent
+from messages import Message
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class ModelRequest:
-    """Agent 交给 Provider 的稳定输入。"""
-
     model: str
     system_prompt: str
     messages: tuple[Message, ...]
@@ -21,10 +19,6 @@ class ModelRequest:
 
 
 class Provider(Protocol):
-    """把统一请求适配成可取消的 Provider 事件流。"""
-
-    provider_id: str
-
     def stream(
         self, request: ModelRequest, cancellation: CancellationToken
     ) -> Iterable[ProviderEvent]: ...
@@ -35,10 +29,6 @@ ScriptedStream: TypeAlias = Sequence[ProviderEvent] | StreamFactory
 
 
 class FakeModel:
-    """按脚本产生流事件并记录请求；测试不连接网络或付费模型。"""
-
-    provider_id = "fake"
-
     def __init__(self, streams: Sequence[ScriptedStream]) -> None:
         self._streams = list(streams)
         self.requests: list[ModelRequest] = []

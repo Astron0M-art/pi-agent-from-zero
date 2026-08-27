@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-27
+
+### Added
+
+- 增加 Provider 流事件与 Agent 生命周期事件，支持增量文本、工具开始/完成和单一终止事件。
+- 增加协作式 `CancellationToken`、整轮截止时间，以及可响应取消的 Bash 子进程轮询。
+- 增加 `03-streaming-cancellation` 独立冻结快照、中文讲义、Pi 源码映射、实验、故障注入和人工事件样例。
+- 增加离线 FakeModel 测试，覆盖半流取消、零秒截止、Provider 失败、协议不一致、命令超时和循环预算。
+
+### Changed
+
+- Provider 边界从 `complete(ModelRequest)` 演进为 `stream(ModelRequest, CancellationToken)`。
+- `Agent.stream()` 成为可观察入口；`Agent.run()` 保留为返回最终文本或抛出带失败类型异常的兼容包装器。
+
 ## [0.2.0] - 2026-08-25
 
 ### Added
@@ -43,7 +57,8 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.1.0
 [0.0.0]: https://github.com/Astron0M-art/pi-agent-from-zero/commits/5d06d3a917ed2f304722eb6ce3176f35c1ca1b93
