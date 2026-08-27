@@ -1,0 +1,9 @@
+# 人工可读事件样例；这不是 v0.14 的结构化 Trace 协议。
+AgentStarted(prompt="告诉我当前目录")
+TextDelta(delta="我先查看当前目录。")
+AssistantCompleted(tool_calls=[bash#call-1])
+ToolStarted(call_id="call-1", name="bash")
+ToolCompleted(call_id="call-1", is_error=false, content=".../pi-agent-from-zero\n")
+TextDelta(delta="工具返回：...")
+AssistantCompleted(content="工具返回：...")
+AgentCompleted(answer="工具返回：...")
