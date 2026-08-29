@@ -7,7 +7,9 @@ from pi_agent_from_zero.events import (
     AgentFailed,
     AgentStarted,
     AssistantCompleted,
+    CancellationRequested,
     CancellationToken,
+    DeadlineExceeded,
     ProviderCompleted,
     ProviderEvent,
     ProviderFailed,
@@ -24,6 +26,17 @@ from pi_agent_from_zero.messages import (
     UserMessage,
 )
 from pi_agent_from_zero.providers import FakeModel, ModelRequest, Provider
+from pi_agent_from_zero.tools import (
+    SchemaDefinitionError,
+    SchemaValidationError,
+    Tool,
+    ToolDefinition,
+    ToolExecutionError,
+    ToolOutcome,
+    ToolRegistry,
+    create_bash_tool,
+    validate_arguments,
+)
 
 __all__ = [
     "Agent",
@@ -34,7 +47,9 @@ __all__ = [
     "AgentStarted",
     "AssistantMessage",
     "AssistantCompleted",
+    "CancellationRequested",
     "CancellationToken",
+    "DeadlineExceeded",
     "FakeModel",
     "Message",
     "ModelRequest",
@@ -44,12 +59,21 @@ __all__ = [
     "ProviderFailed",
     "ProviderTextDelta",
     "TextDeltaEvent",
+    "Tool",
     "ToolCall",
     "ToolResultMessage",
     "ToolCompleted",
+    "ToolDefinition",
+    "ToolExecutionError",
+    "ToolOutcome",
+    "ToolRegistry",
     "ToolStarted",
     "UserMessage",
+    "SchemaDefinitionError",
+    "SchemaValidationError",
     "__version__",
+    "create_bash_tool",
+    "validate_arguments",
 ]
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

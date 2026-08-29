@@ -10,15 +10,15 @@ The project starts with an approximately 100-line Python agent and evolves on a 
 
 ## Status
 
-Current release: [`v0.3.0`, streaming events and cancellation](lessons/03-streaming-cancellation/README.md). It adds incremental text, typed Agent lifecycle events, deadlines, and cooperative cancellation. Partial assistant output is rendered but never committed to model history.
+Current release: [`v0.4.0`, tool runtime](lessons/04-tool-runtime/README.md). It adds model-visible tool definitions, schema validation before side effects, a unified Tool Registry, and separate model-turn and tool-call budgets.
 
 ## Run the latest release
 
 No API key is required:
 
 ```bash
-python lessons/03-streaming-cancellation/snapshot/agent.py
-python -m unittest discover -s lessons/03-streaming-cancellation/tests -v
+python lessons/04-tool-runtime/snapshot/agent.py
+python -m unittest discover -s lessons/04-tool-runtime/tests -v
 ```
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.

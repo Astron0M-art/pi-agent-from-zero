@@ -1,0 +1,15 @@
+# 人工可读教学样例；不是结构化 Trace 协议。
+ModelRequest.tools = [bash(name, description, parameters.schema)]
+AssistantMessage.tool_calls = [call-1 bash {command: "pwd"}]
+Registry.find("bash") = found
+Registry.validate(call-1.arguments) = valid
+ToolStarted(call-1)
+ToolCompleted(call-1, is_error=false, content=".../pi-agent-from-zero\n")
+ToolResultMessage.tool_call_id = call-1
+AgentCompleted(answer="工具返回：...")
+
+# 故障注入
+AssistantMessage.tool_calls = [bad-1 bash {command: 42}]
+Registry.validate = "arguments.command: expected string"
+ToolCompleted(bad-1, is_error=true)
+# approval 未调用，shell 未启动

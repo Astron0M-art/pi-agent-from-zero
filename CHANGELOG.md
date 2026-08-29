@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-29
+
+### Added
+
+- 增加模型可见 `ToolDefinition`、不可变 Schema 副本和工具名称/Schema 声明校验。
+- 增加 `ToolRegistry`，统一工具查找、参数验证、执行、异常归一化和 ToolResult 调用 ID 关联。
+- 增加独立的工具调用预算，与模型轮次预算共同阻止失控循环和额外副作用。
+- 增加 `04-tool-runtime` 独立冻结快照、中文讲义、架构说明、Pi 源码映射、实验、练习、答案和人工轨迹。
+- 增加离线 FakeModel 与工具运行时测试，覆盖正常调用、错误 Schema、错误参数、未知/重复工具、执行异常、审批、取消和预算阻断。
+
+### Changed
+
+- `ModelRequest` 从工具名称元组演进为完整工具定义元组。
+- Bash 参数校验与执行从 Agent 主循环迁移到可注入 Registry；Agent 只负责编排事件和预算。
+
 ## [0.3.0] - 2026-08-27
 
 ### Added
@@ -57,7 +72,8 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.1.0
