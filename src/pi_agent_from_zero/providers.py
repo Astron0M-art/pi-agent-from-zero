@@ -8,6 +8,7 @@ from typing import Protocol, TypeAlias
 
 from pi_agent_from_zero.events import CancellationToken, ProviderEvent
 from pi_agent_from_zero.messages import Message
+from pi_agent_from_zero.tools import ToolDefinition
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,7 +18,7 @@ class ModelRequest:
     model: str
     system_prompt: str
     messages: tuple[Message, ...]
-    available_tools: tuple[str, ...]
+    tools: tuple[ToolDefinition, ...]
 
 
 class Provider(Protocol):

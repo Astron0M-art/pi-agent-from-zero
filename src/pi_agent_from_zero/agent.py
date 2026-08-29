@@ -1,11 +1,8 @@
-"""v0.3.0: 产生可观察、可取消事件流的本地 Agent。"""
+"""v0.4.0: 使用工具 Registry 和双重循环预算的本地 Agent。"""
 
 from __future__ import annotations
 
-import subprocess
-import time
-from collections.abc import Callable, Generator, Iterator
-from pathlib import Path
+from collections.abc import Generator, Iterator
 
 from pi_agent_from_zero.events import (
     AgentCompleted,
@@ -32,8 +29,7 @@ from pi_agent_from_zero.messages import (
     UserMessage,
 )
 from pi_agent_from_zero.providers import FakeModel, ModelRequest, Provider
-
-Approval = Callable[[str], bool]
+from pi_agent_from_zero.tools import ToolRegistry, create_bash_tool
 
 
 class AgentRunError(RuntimeError):
@@ -57,30 +53,28 @@ class _BudgetError(RuntimeError):
 
 
 class Agent:
-    """在 Provider 流和审批后的 Bash 结果之间循环，并发出生命周期事件。"""
+    """在 Provider 流和 Registry 工具结果之间循环，并发出生命周期事件。"""
 
     def __init__(
         self,
         provider: Provider,
-        approve: Approval,
+        tools: ToolRegistry,
         *,
         model: str = "default",
         system_prompt: str = "You are a local coding agent.",
-        cwd: Path | None = None,
         max_turns: int = 8,
-        command_timeout_seconds: float = 10,
+        max_tool_calls: int = 16,
     ) -> None:
         if max_turns < 1:
             raise ValueError("max_turns must be at least 1")
-        if command_timeout_seconds <= 0:
-            raise ValueError("command_timeout_seconds must be positive")
+        if max_tool_calls < 1:
+            raise ValueError("max_tool_calls must be at least 1")
         self.provider = provider
-        self.approve = approve
+        self.tools = tools
         self.model = model
         self.system_prompt = system_prompt
-        self.cwd = (cwd or Path.cwd()).resolve()
         self.max_turns = max_turns
-        self.command_timeout_seconds = command_timeout_seconds
+        self.max_tool_calls = max_tool_calls
         self.messages: list[Message] = []
 
     def stream(
@@ -97,6 +91,7 @@ class Agent:
         try:
             token.checkpoint()
             self.messages.append(UserMessage(prompt))
+            tool_calls_used = 0
             for _ in range(self.max_turns):
                 reply = yield from self._stream_reply(token)
                 self.messages.append(reply)
@@ -107,8 +102,11 @@ class Agent:
 
                 for call in reply.tool_calls:
                     token.checkpoint()
+                    if tool_calls_used >= self.max_tool_calls:
+                        raise _BudgetError(f"agent exceeded {self.max_tool_calls} tool calls")
+                    tool_calls_used += 1
                     yield ToolStarted(call)
-                    result = self._execute(call, token)
+                    result = self.tools.execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
 
@@ -151,7 +149,7 @@ class Agent:
             model=self.model,
             system_prompt=self.system_prompt,
             messages=tuple(self.messages),
-            available_tools=("bash",),
+            tools=self.tools.definitions,
         )
         deltas: list[str] = []
         completed: AssistantMessage | None = None
@@ -186,71 +184,6 @@ class Agent:
             raise _ProtocolError("streamed text does not match completed message content")
         return completed
 
-    def _execute(self, call: ToolCall, cancellation: CancellationToken) -> ToolResultMessage:
-        if call.name != "bash":
-            return self._tool_error(call, f"unknown tool: {call.name}")
-
-        command = call.arguments.get("command")
-        if not isinstance(command, str) or not command.strip():
-            return self._tool_error(call, "bash.command must be a non-empty string")
-        cancellation.checkpoint()
-        if not self.approve(command):
-            return self._tool_error(call, "user denied the bash command")
-        cancellation.checkpoint()
-
-        try:
-            process = subprocess.Popen(
-                ["bash", "-lc", command],
-                cwd=self.cwd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except OSError as error:
-            return self._tool_error(call, f"could not start command: {error}")
-
-        started_at = time.monotonic()
-        while True:
-            try:
-                stdout, stderr = process.communicate(timeout=0.05)
-                break
-            except subprocess.TimeoutExpired:
-                try:
-                    cancellation.checkpoint()
-                except (CancellationRequested, DeadlineExceeded):
-                    self._stop_process(process)
-                    raise
-                if time.monotonic() - started_at >= self.command_timeout_seconds:
-                    self._stop_process(process)
-                    return self._tool_error(
-                        call,
-                        f"command timed out after {self.command_timeout_seconds:g}s",
-                    )
-
-        output = stdout + stderr
-        is_error = process.returncode != 0
-        if is_error:
-            output += f"\ncommand exited with {process.returncode}"
-        return ToolResultMessage(
-            tool_call_id=call.id,
-            tool_name=call.name,
-            content=output or "(no output)",
-            is_error=is_error,
-        )
-
-    @staticmethod
-    def _stop_process(process: subprocess.Popen[str]) -> None:
-        process.terminate()
-        try:
-            process.communicate(timeout=0.2)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.communicate()
-
-    @staticmethod
-    def _tool_error(call: ToolCall, message: str) -> ToolResultMessage:
-        return ToolResultMessage(call.id, call.name, message, is_error=True)
-
 
 def _final_stream(
     request: ModelRequest, cancellation: CancellationToken
@@ -271,7 +204,7 @@ def _ask(command: str) -> bool:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行 v0.3.0 流式事件与取消离线演示")
+    parser = argparse.ArgumentParser(description="运行 v0.4.0 工具 Registry 离线演示")
     parser.add_argument("prompt", nargs="?", default="告诉我当前目录")
     args = parser.parse_args()
     first_text = "我先确认当前工作目录。"
@@ -289,7 +222,8 @@ def main() -> None:
             _final_stream,
         ]
     )
-    agent = Agent(fake, _ask, model="fake-scripted")
+    registry = ToolRegistry([create_bash_tool(_ask)])
+    agent = Agent(fake, registry, model="fake-scripted")
     for event in agent.stream(args.prompt):
         if isinstance(event, TextDeltaEvent):
             print(event.delta, end="", flush=True)

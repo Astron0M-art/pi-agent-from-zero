@@ -20,9 +20,11 @@ from pi_agent_from_zero import (
     TextDeltaEvent,
     ToolCall,
     ToolCompleted,
+    ToolRegistry,
     ToolResultMessage,
     ToolStarted,
     UserMessage,
+    create_bash_tool,
 )
 
 
@@ -34,16 +36,23 @@ def completed(message: AssistantMessage) -> list[ProviderCompleted]:
     return [ProviderCompleted(message)]
 
 
-def test_direct_answer_streams_typed_events_and_request() -> None:
+def bash_registry(approve=lambda _command: True, *, cwd: Path | None = None) -> ToolRegistry:
+    return ToolRegistry([create_bash_tool(approve, cwd=cwd)])
+
+
+def test_direct_answer_streams_events_and_tool_definitions() -> None:
     message = AssistantMessage("直接回答")
     fake = FakeModel(
         [[ProviderTextDelta("直接"), ProviderTextDelta("回答"), ProviderCompleted(message)]]
     )
 
     events = list(
-        Agent(fake, lambda _command: True, model="lesson-model", system_prompt="教学").stream(
-            "你好"
-        )
+        Agent(
+            fake,
+            bash_registry(),
+            model="lesson-model",
+            system_prompt="教学",
+        ).stream("你好")
     )
 
     assert events == [
@@ -56,8 +65,9 @@ def test_direct_answer_streams_typed_events_and_request() -> None:
     request = fake.requests[0]
     assert request.model == "lesson-model"
     assert request.system_prompt == "教学"
-    assert request.available_tools == ("bash",)
     assert request.messages == (UserMessage("你好"),)
+    assert [tool.name for tool in request.tools] == ["bash"]
+    assert request.tools[0].parameters["required"] == ("command",)
 
 
 def test_approved_bash_emits_tool_events_and_keeps_identity(tmp_path: Path) -> None:
@@ -70,7 +80,7 @@ def test_approved_bash_emits_tool_events_and_keeps_identity(tmp_path: Path) -> N
 
     fake = FakeModel([completed(AssistantMessage(tool_calls=(call,))), finish])
 
-    events = list(Agent(fake, lambda _command: True, cwd=tmp_path).stream("写入文件"))
+    events = list(Agent(fake, bash_registry(cwd=tmp_path)).stream("写入文件"))
 
     assert (tmp_path / "result.txt").read_text() == "lesson"
     assert ToolStarted(call) in events
@@ -86,7 +96,7 @@ def test_denied_and_unknown_tools_become_model_visible_errors(tmp_path: Path) ->
             completed(AssistantMessage("已停止")),
         ]
     )
-    Agent(denied, lambda _command: False, cwd=tmp_path).run("写入")
+    Agent(denied, bash_registry(lambda _command: False, cwd=tmp_path)).run("写入")
     denied_result = denied.requests[1].messages[-1]
     assert isinstance(denied_result, ToolResultMessage)
     assert denied_result.is_error is True
@@ -100,10 +110,29 @@ def test_denied_and_unknown_tools_become_model_visible_errors(tmp_path: Path) ->
             completed(AssistantMessage("工具不可用")),
         ]
     )
-    Agent(unknown, lambda _command: pytest.fail("approval must not run")).run("读取")
+    Agent(unknown, ToolRegistry([])).run("读取")
     assert unknown.requests[1].messages[-1] == ToolResultMessage(
-        "call-read", "read", "unknown tool: read", is_error=True
+        "call-read", "read", "tool not found: read", is_error=True
     )
+
+
+def test_invalid_arguments_do_not_reach_approval_or_shell(tmp_path: Path) -> None:
+    fake = FakeModel(
+        [
+            completed(AssistantMessage(tool_calls=(bash_call(42),))),
+            completed(AssistantMessage("参数错误")),
+        ]
+    )
+
+    Agent(
+        fake,
+        bash_registry(lambda _command: pytest.fail("approval must not run"), cwd=tmp_path),
+    ).run("执行")
+
+    result = fake.requests[1].messages[-1]
+    assert isinstance(result, ToolResultMessage)
+    assert result.is_error is True
+    assert result.content == "invalid arguments: arguments.command: expected string"
 
 
 def test_external_cancellation_discards_partial_assistant_message() -> None:
@@ -116,7 +145,7 @@ def test_external_cancellation_discards_partial_assistant_message() -> None:
         root.cancel("测试请求停止")
         yield ProviderCompleted(AssistantMessage("只完成一半"))
 
-    agent = Agent(FakeModel([cancelling_stream]), lambda _command: True)
+    agent = Agent(FakeModel([cancelling_stream]), ToolRegistry([]))
 
     events = list(agent.stream("开始", cancellation=root))
 
@@ -127,7 +156,7 @@ def test_external_cancellation_discards_partial_assistant_message() -> None:
 
 def test_zero_timeout_stops_before_mutating_history_or_calling_provider() -> None:
     fake = FakeModel([completed(AssistantMessage("来不及"))])
-    agent = Agent(fake, lambda _command: True)
+    agent = Agent(fake, ToolRegistry([]))
 
     events = list(agent.stream("开始", timeout_seconds=0))
 
@@ -147,7 +176,7 @@ def test_zero_timeout_stops_before_mutating_history_or_calling_provider() -> Non
     ],
 )
 def test_provider_failures_have_explicit_terminal_event(stream: list, kind: str) -> None:
-    agent = Agent(FakeModel([stream]), lambda _command: True)
+    agent = Agent(FakeModel([stream]), ToolRegistry([]))
 
     events = list(agent.stream("开始"))
 
@@ -164,12 +193,10 @@ def test_command_timeout_is_a_tool_result_and_agent_can_continue(tmp_path: Path)
         ]
     )
 
-    answer = Agent(
-        fake,
-        lambda _command: True,
-        cwd=tmp_path,
-        command_timeout_seconds=0.01,
-    ).run("运行")
+    registry = ToolRegistry(
+        [create_bash_tool(lambda _command: True, cwd=tmp_path, timeout_seconds=0.01)]
+    )
+    answer = Agent(fake, registry).run("运行")
 
     result = fake.requests[1].messages[-1]
     assert isinstance(result, ToolResultMessage)
@@ -178,7 +205,7 @@ def test_command_timeout_is_a_tool_result_and_agent_can_continue(tmp_path: Path)
     assert answer == "已处理超时"
 
 
-def test_turn_budget_and_run_wrapper_expose_failure_kind(tmp_path: Path) -> None:
+def test_model_turn_budget_exposes_failure_kind(tmp_path: Path) -> None:
     fake = FakeModel(
         [
             completed(AssistantMessage(tool_calls=(bash_call("true", call_id="one"),))),
@@ -187,7 +214,23 @@ def test_turn_budget_and_run_wrapper_expose_failure_kind(tmp_path: Path) -> None
     )
 
     with pytest.raises(AgentRunError) as raised:
-        Agent(fake, lambda _command: True, cwd=tmp_path, max_turns=2).run("不要停")
+        Agent(fake, bash_registry(cwd=tmp_path), max_turns=2).run("不要停")
 
     assert raised.value.kind == "budget"
     assert "exceeded 2 turns" in str(raised.value)
+
+
+def test_tool_call_budget_stops_before_extra_side_effect(tmp_path: Path) -> None:
+    calls = (
+        bash_call("touch first", call_id="one"),
+        bash_call("touch forbidden", call_id="two"),
+    )
+    fake = FakeModel([completed(AssistantMessage(tool_calls=calls))])
+    agent = Agent(fake, bash_registry(cwd=tmp_path), max_tool_calls=1)
+
+    events = list(agent.stream("只允许一次工具"))
+
+    assert (tmp_path / "first").exists()
+    assert not (tmp_path / "forbidden").exists()
+    assert events[-1] == AgentFailed("budget", "agent exceeded 1 tool calls")
+    assert ToolStarted(calls[1]) not in events

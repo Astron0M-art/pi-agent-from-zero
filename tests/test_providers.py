@@ -11,7 +11,7 @@ from pi_agent_from_zero import (
 
 
 def request() -> ModelRequest:
-    return ModelRequest("fake", "system", (UserMessage("hello"),), ("bash",))
+    return ModelRequest("fake", "system", (UserMessage("hello"),), ())
 
 
 def test_fake_model_can_compute_stream_from_request() -> None:
