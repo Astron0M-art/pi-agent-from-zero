@@ -1,9 +1,11 @@
-"""v0.4.0: 使用工具 Registry 和双重循环预算的本地 Agent。"""
+"""v0.5.0: 使用项目内 Coding Tools 的本地 Agent。"""
 
 from __future__ import annotations
 
 from collections.abc import Generator, Iterator
+from pathlib import Path
 
+from pi_agent_from_zero.coding_tools import create_coding_tools
 from pi_agent_from_zero.events import (
     AgentCompleted,
     AgentEvent,
@@ -29,7 +31,7 @@ from pi_agent_from_zero.messages import (
     UserMessage,
 )
 from pi_agent_from_zero.providers import FakeModel, ModelRequest, Provider
-from pi_agent_from_zero.tools import ToolRegistry, create_bash_tool
+from pi_agent_from_zero.tools import ToolRegistry
 
 
 class AgentRunError(RuntimeError):
@@ -191,23 +193,23 @@ def _final_stream(
     del cancellation
     result = request.messages[-1]
     assert isinstance(result, ToolResultMessage)
-    text = f"任务演示完成，bash 返回：\n{result.content}"
+    text = f"任务演示完成，read 返回的开头是：\n{result.content[:120]}"
     yield ProviderTextDelta(text)
     yield ProviderCompleted(AssistantMessage(text))
 
 
-def _ask(command: str) -> bool:
-    answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
+def _ask(operation: str) -> bool:
+    answer = input(f"允许执行 `{operation}` 吗？[y/N] ")
     return answer.strip().lower() in {"y", "yes"}
 
 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行 v0.4.0 工具 Registry 离线演示")
-    parser.add_argument("prompt", nargs="?", default="告诉我当前目录")
+    parser = argparse.ArgumentParser(description="运行 v0.5.0 Coding Tools 离线演示")
+    parser.add_argument("prompt", nargs="?", default="读一下项目 README")
     args = parser.parse_args()
-    first_text = "我先确认当前工作目录。"
+    first_text = "我先读取项目 README；read 是只读工具，不需要审批。"
     fake = FakeModel(
         [
             [
@@ -215,14 +217,14 @@ def main() -> None:
                 ProviderCompleted(
                     AssistantMessage(
                         first_text,
-                        (ToolCall("call-1", "bash", {"command": "pwd"}),),
+                        (ToolCall("call-1", "read", {"path": "README.md"}),),
                     )
                 ),
             ],
             _final_stream,
         ]
     )
-    registry = ToolRegistry([create_bash_tool(_ask)])
+    registry = ToolRegistry(create_coding_tools(Path.cwd(), _ask))
     agent = Agent(fake, registry, model="fake-scripted")
     for event in agent.stream(args.prompt):
         if isinstance(event, TextDeltaEvent):

@@ -1,4 +1,4 @@
-"""v0.4.0 工具定义、Schema 校验、Registry 与 Bash 工具。"""
+"""工具定义、Schema 校验、Registry、输出截断与 Bash 工具。"""
 
 from __future__ import annotations
 
@@ -34,6 +34,41 @@ class SchemaValidationError(ValueError):
 
 class ToolExecutionError(RuntimeError):
     """工具预期内失败，应该安全地回填给模型。"""
+
+
+@dataclass(frozen=True, slots=True)
+class OutputLimits:
+    """模型可见工具结果的字符与行数上限。"""
+
+    max_chars: int = 4_000
+    max_lines: int = 200
+
+    def __post_init__(self) -> None:
+        if self.max_chars < 1 or self.max_lines < 1:
+            raise ValueError("output limits must be positive")
+
+
+def truncate_output(content: str, limits: OutputLimits) -> str:
+    """保留结果头部并附截断标记；返回值本身也不超过上限。"""
+
+    lines = content.splitlines()
+    total_lines = len(lines)
+    if len(content) <= limits.max_chars and total_lines <= limits.max_lines:
+        return content
+
+    marker = f"[truncated: {total_lines} lines, {len(content)} chars total]"
+    if limits.max_lines == 1:
+        return marker[: limits.max_chars]
+
+    visible_lines = lines[: limits.max_lines - 1]
+    prefix = "\n".join(visible_lines)
+    available = limits.max_chars - len(marker) - 1
+    if available <= 0:
+        return marker[: limits.max_chars]
+    prefix = prefix[:available].rstrip("\n")
+    if not prefix:
+        return marker[: limits.max_chars]
+    return f"{prefix}\n{marker}"
 
 
 def _freeze(value: object) -> object:
@@ -168,7 +203,7 @@ def validate_arguments(
 class ToolRegistry:
     """工具声明与执行的唯一入口。"""
 
-    def __init__(self, tools: Iterable[Tool]) -> None:
+    def __init__(self, tools: Iterable[Tool], *, output_limits: OutputLimits | None = None) -> None:
         by_name: dict[str, Tool] = {}
         for tool in tools:
             name = tool.definition.name
@@ -177,6 +212,7 @@ class ToolRegistry:
             by_name[name] = tool
         self._tools = MappingProxyType(by_name)
         self._definitions = tuple(tool.definition for tool in by_name.values())
+        self._output_limits = output_limits or OutputLimits()
 
     @property
     def definitions(self) -> tuple[ToolDefinition, ...]:
@@ -197,7 +233,7 @@ class ToolRegistry:
             return ToolResultMessage(
                 call.id,
                 call.name,
-                outcome.content or "(no output)",
+                truncate_output(outcome.content or "(no output)", self._output_limits),
                 is_error=outcome.is_error,
             )
         except (CancellationRequested, DeadlineExceeded):

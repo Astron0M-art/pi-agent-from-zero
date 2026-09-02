@@ -1,6 +1,14 @@
 """从零构建本地 Coding Agent 的教学实现。"""
 
 from pi_agent_from_zero.agent import Agent, AgentRunError
+from pi_agent_from_zero.coding_tools import (
+    ProjectWorkspace,
+    create_coding_tools,
+    create_edit_tool,
+    create_grep_tool,
+    create_read_tool,
+    create_write_tool,
+)
 from pi_agent_from_zero.events import (
     AgentCompleted,
     AgentEvent,
@@ -27,6 +35,7 @@ from pi_agent_from_zero.messages import (
 )
 from pi_agent_from_zero.providers import FakeModel, ModelRequest, Provider
 from pi_agent_from_zero.tools import (
+    OutputLimits,
     SchemaDefinitionError,
     SchemaValidationError,
     Tool,
@@ -35,6 +44,7 @@ from pi_agent_from_zero.tools import (
     ToolOutcome,
     ToolRegistry,
     create_bash_tool,
+    truncate_output,
     validate_arguments,
 )
 
@@ -53,6 +63,8 @@ __all__ = [
     "FakeModel",
     "Message",
     "ModelRequest",
+    "OutputLimits",
+    "ProjectWorkspace",
     "Provider",
     "ProviderCompleted",
     "ProviderEvent",
@@ -73,7 +85,13 @@ __all__ = [
     "SchemaValidationError",
     "__version__",
     "create_bash_tool",
+    "create_coding_tools",
+    "create_edit_tool",
+    "create_grep_tool",
+    "create_read_tool",
+    "create_write_tool",
+    "truncate_output",
     "validate_arguments",
 ]
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

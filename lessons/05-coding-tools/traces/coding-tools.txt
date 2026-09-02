@@ -1,0 +1,15 @@
+人工可读协议样例（不是私有 Session 或模型 Trace）
+
+USER: 读一下 README
+ASSISTANT: 我先读取项目 README。
+TOOL_CALL id=read-1 name=read arguments={"path":"README.md"}
+TOOL_RESULT id=read-1 name=read is_error=false content="# Pi Agent from Zero ..."
+ASSISTANT: 已读取 README，项目是一个中文优先的 Coding Agent 教学仓库。
+
+边界样例：
+TOOL_CALL id=read-2 name=read arguments={"path":"../secret"}
+TOOL_RESULT id=read-2 name=read is_error=true content="path escapes the project root"
+
+截断样例：
+TOOL_CALL id=read-3 name=read arguments={"path":"long.txt"}
+TOOL_RESULT id=read-3 name=read is_error=false content="line-1\nline-2\n[truncated: 30 lines, 260 chars total]"
