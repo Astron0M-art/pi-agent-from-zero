@@ -10,15 +10,15 @@ The project starts with an approximately 100-line Python agent and evolves on a 
 
 ## Status
 
-Current release: [`v0.4.0`, tool runtime](lessons/04-tool-runtime/README.md). It adds model-visible tool definitions, schema validation before side effects, a unified Tool Registry, and separate model-turn and tool-call budgets.
+Current release: [`v0.5.0`, Coding Tools](lessons/05-coding-tools/README.md). It adds project-rooted `read`, `write`, `edit`, `bash`, and `grep` tools, plus uniform output truncation before results enter model context.
 
 ## Run the latest release
 
 No API key is required:
 
 ```bash
-python lessons/04-tool-runtime/snapshot/agent.py
-python -m unittest discover -s lessons/04-tool-runtime/tests -v
+python lessons/05-coding-tools/snapshot/agent.py
+python -m unittest discover -s lessons/05-coding-tools/tests -v
 ```
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.

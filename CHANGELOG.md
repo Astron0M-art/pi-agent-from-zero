@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-02
+
+### Added
+
+- 增加共享 `ProjectWorkspace` 的 `read`、`write`、`edit` 与字面 `grep`，并与现有 `bash` 组成稳定的五工具集合。
+- 增加项目根路径约束，拒绝绝对路径、父目录逃逸和已存在的符号链接逃逸。
+- 增加 `OutputLimits` 和 Registry 级统一输出截断，限制每个成功工具结果进入模型上下文的字符数与行数。
+- 增加 `05-coding-tools` 独立冻结快照、中文讲义、架构说明、Pi 源码映射、实验、练习、答案和人工协议样例。
+- 增加离线 FakeModel 与临时目录测试，覆盖读取、写入审批、唯一精确编辑、搜索预算、路径边界、无副作用失败和结果截断。
+
+### Changed
+
+- 离线 CLI 演示从审批执行 `pwd` 演进为用五工具 Registry 读取项目 README。
+- 当前包版本升级到 `0.5.0`；v0.4.0 继续由冻结快照保留。
+
 ## [0.4.0] - 2026-08-29
 
 ### Added
@@ -72,7 +87,8 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.2.0

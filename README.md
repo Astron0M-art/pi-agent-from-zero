@@ -10,20 +10,20 @@
 
 ## 项目状态
 
-当前版本：[`v0.4.0` 工具运行时](lessons/04-tool-runtime/README.md)。新增模型可见 ToolDefinition、Schema 参数校验、统一 Tool Registry，以及模型轮次与工具调用双重预算；错误参数会在审批和副作用之前被拦截。
+当前版本：[`v0.5.0` Coding Tools](lessons/05-coding-tools/README.md)。新增项目根目录内的 `read`、`write`、`edit`、`bash`、`grep`，并在所有工具结果进入模型上下文前统一截断。
 
 ## 5 分钟跑通最新版本
 
 无需 API Key。在仓库根目录执行：
 
 ```bash
-python lessons/04-tool-runtime/snapshot/agent.py
+python lessons/05-coding-tools/snapshot/agent.py
 ```
 
-看到 `pwd` 审批提示后输入 `y`。如果想验证拒绝路径，再运行一次并输入 `n`。冻结快照的独立测试：
+演示会用离线 FakeModel 读取仓库 README，不需要审批，也不会修改仓库。冻结快照的独立测试：
 
 ```bash
-python -m unittest discover -s lessons/04-tool-runtime/tests -v
+python -m unittest discover -s lessons/05-coding-tools/tests -v
 ```
 
 想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)；旧版本冻结快照不会被最新实现覆盖。
