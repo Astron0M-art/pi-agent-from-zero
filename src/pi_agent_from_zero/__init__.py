@@ -47,6 +47,15 @@ from pi_agent_from_zero.tools import (
     truncate_output,
     validate_arguments,
 )
+from pi_agent_from_zero.tui import (
+    InputBuffer,
+    MessageView,
+    ToolCard,
+    TuiApp,
+    TuiRenderer,
+    TuiState,
+    reduce_event,
+)
 
 __all__ = [
     "Agent",
@@ -62,6 +71,7 @@ __all__ = [
     "DeadlineExceeded",
     "FakeModel",
     "Message",
+    "MessageView",
     "ModelRequest",
     "OutputLimits",
     "ProjectWorkspace",
@@ -72,6 +82,7 @@ __all__ = [
     "ProviderTextDelta",
     "TextDeltaEvent",
     "Tool",
+    "ToolCard",
     "ToolCall",
     "ToolResultMessage",
     "ToolCompleted",
@@ -80,6 +91,9 @@ __all__ = [
     "ToolOutcome",
     "ToolRegistry",
     "ToolStarted",
+    "TuiApp",
+    "TuiRenderer",
+    "TuiState",
     "UserMessage",
     "SchemaDefinitionError",
     "SchemaValidationError",
@@ -90,8 +104,10 @@ __all__ = [
     "create_grep_tool",
     "create_read_tool",
     "create_write_tool",
+    "InputBuffer",
+    "reduce_event",
     "truncate_output",
     "validate_arguments",
 ]
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"

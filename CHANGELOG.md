@@ -4,6 +4,21 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-04
+
+### Added
+
+- 增加不可变 `InputBuffer`、显示时间线、`ToolCard`、`TuiState` 和纯函数事件归约器。
+- 增加固定宽高、无 ANSI 的确定性 `TuiRenderer`，在视口溢出时保留最新内容、输入区和状态栏。
+- 增加一次一问的 `TuiApp`，把输入提交、Agent 事件流和逐帧渲染连接起来；包入口改为离线 TUI 演示。
+- 增加 `06-tui-basics` 独立冻结快照、中文讲义、架构说明、Pi 源码映射、实验、练习、答案和人工事件样例。
+- 增加离线 FakeModel 测试，覆盖输入编辑、流式文本去重、时间顺序、工具成功/失败卡片、终止失败、视口预算和模型/UI 状态隔离。
+
+### Changed
+
+- CLI 从日志式工具演示演进为固定尺寸终端帧，消息与工具卡片按真实事件顺序显示。
+- 当前包版本升级到 `0.6.0`；旧版本继续由各自冻结快照保留。
+
 ## [0.5.0] - 2026-09-02
 
 ### Added
@@ -87,7 +102,8 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.3.0

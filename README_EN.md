@@ -10,15 +10,15 @@ The project starts with an approximately 100-line Python agent and evolves on a 
 
 ## Status
 
-Current release: [`v0.5.0`, Coding Tools](lessons/05-coding-tools/README.md). It adds project-rooted `read`, `write`, `edit`, `bash`, and `grep` tools, plus uniform output truncation before results enter model context.
+Current release: [`v0.6.0`, TUI basics](lessons/06-tui-basics/README.md). It adds an event-driven input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context.
 
 ## Run the latest release
 
 No API key is required:
 
 ```bash
-python lessons/05-coding-tools/snapshot/agent.py
-python -m unittest discover -s lessons/05-coding-tools/tests -v
+python lessons/06-tui-basics/snapshot/tui.py
+python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.

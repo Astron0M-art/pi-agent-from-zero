@@ -1,0 +1,16 @@
+人工可读事件样例（不是私有 Session 或未脱敏 Trace）
+
+AgentStarted(prompt="在 README 里搜索 Pi Agent")
+TextDeltaEvent(delta="我先搜索 README。")
+AssistantCompleted(content="我先搜索 README。", tool_calls=[grep-1])
+ToolStarted(id=grep-1, name=grep)
+ToolCompleted(id=grep-1, is_error=false, content="README.md:1:# Pi Agent from Zero")
+TextDeltaEvent(delta="找到 README 中的项目标题。")
+AssistantCompleted(content="找到 README 中的项目标题。")
+AgentCompleted(answer="找到 README 中的项目标题。")
+
+显示投影终态：
+- messages: user + assistant + assistant
+- tool_cards: grep-1 succeeded
+- input: empty, cursor=0
+- status: completed
