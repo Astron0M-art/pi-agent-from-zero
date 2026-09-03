@@ -1,4 +1,4 @@
-"""v0.5.0: 使用项目内 Coding Tools 的本地 Agent。"""
+"""在 Provider 流与 Coding Tools 之间编排事件的本地 Agent。"""
 
 from __future__ import annotations
 

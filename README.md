@@ -10,20 +10,20 @@
 
 ## 项目状态
 
-当前版本：[`v0.5.0` Coding Tools](lessons/05-coding-tools/README.md)。新增项目根目录内的 `read`、`write`、`edit`、`bash`、`grep`，并在所有工具结果进入模型上下文前统一截断。
+当前版本：[`v0.6.0` TUI 基础](lessons/06-tui-basics/README.md)。新增事件驱动的输入区、消息时间线、工具卡片、固定状态栏和有限视口，并保持显示状态与模型上下文分离。
 
 ## 5 分钟跑通最新版本
 
 无需 API Key。在仓库根目录执行：
 
 ```bash
-python lessons/05-coding-tools/snapshot/agent.py
+python lessons/06-tui-basics/snapshot/tui.py
 ```
 
-演示会用离线 FakeModel 读取仓库 README，不需要审批，也不会修改仓库。冻结快照的独立测试：
+演示会用离线 FakeModel 搜索仓库 README，并渲染一块固定尺寸的最终终端帧，不需要 API Key，也不会修改仓库。冻结快照的独立测试：
 
 ```bash
-python -m unittest discover -s lessons/05-coding-tools/tests -v
+python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
 想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)；旧版本冻结快照不会被最新实现覆盖。
