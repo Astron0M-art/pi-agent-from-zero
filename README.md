@@ -4,7 +4,7 @@
 
 一个中文优先、源码对照、可运行的本地 Coding Agent 教学项目。
 
-本项目从约 100 行 Python Agent 出发，按路线逐步加入流式事件、工具系统、终端交互、权限控制、会话恢复、MCP、Skills、扩展机制、Trace 回放与评测。自动维护在北京时间每月单数日期 00:00 启动检查，但没有为了赶日历而发布版本的承诺。
+本项目从约 100 行 Python Agent 出发，按路线逐步加入流式事件、工具系统、终端交互、权限控制、会话恢复、MCP、Skills、扩展机制、Trace 回放与评测。版本成熟后才发布，不以自动检查频率代替质量门禁。
 
 > 本项目受 [earendil-works/pi](https://github.com/earendil-works/pi) 启发，但不是 Pi 官方项目，也不是 Pi 的 Python 移植版。
 
@@ -16,16 +16,18 @@
 
 ## 5 分钟跑通最新版本
 
-无需 API Key。在仓库根目录执行：
+要求本机已安装 Python 3.11 或更高版本，无需 API Key。在仓库根目录先创建项目环境：
 
 ```bash
-python lessons/06-tui-basics/snapshot/tui.py
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 ```
 
-演示会用离线 FakeModel 搜索仓库 README，并渲染一块固定尺寸的最终终端帧，不需要 API Key，也不会修改仓库。冻结快照的独立测试：
+演示会用离线 FakeModel 搜索仓库 README，并输出一块 18 行的确定性文本帧，不需要 API Key，也不会修改仓库。渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
 
 ```bash
-python -m unittest discover -s lessons/06-tui-basics/tests -v
+.venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
 想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)；旧版本冻结快照不会被最新实现覆盖。

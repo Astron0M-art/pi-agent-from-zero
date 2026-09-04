@@ -9,21 +9,21 @@
 - 把 `AgentEvent` 看作运行时事实，把 `TuiState` 看作可重建的显示投影；
 - 用纯函数 `reduce_event(state, event)` 处理流式文本与工具生命周期；
 - 理解输入缓冲、消息区、工具卡片和状态栏各自的权威边界；
-- 在固定宽高下保留最新信息，同时始终显示输入区与状态栏；
+- 在固定逻辑宽高下保留最新信息，同时始终显示输入区与状态栏；
 - 用 FakeModel 验证完整 UI 链路，而不是截图后凭肉眼判断。
 
 先修：[`v0.5.0 Coding Tools`](../05-coding-tools/README.md)。
 
 ## 5 分钟运行
 
-在仓库根目录执行：
+要求 Python 3.11 或更高版本。先按仓库首页创建 `.venv`，再在仓库根目录执行：
 
 ```bash
-python lessons/06-tui-basics/snapshot/tui.py
-python -m unittest discover -s lessons/06-tui-basics/tests -v
+.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
+.venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
-第一条命令会让离线 FakeModel 搜索 README，并输出最终 72×18 文本帧。第二条命令应显示 5 个测试全部通过。
+第一条命令会让离线 FakeModel 搜索 README，并输出 18 行、每行名义 72 个 Python 字符的最终文本帧；Unicode 字符实际占用的终端显示列可能更多。第二条命令应显示 5 个测试全部通过。
 
 ## 阅读顺序
 
@@ -38,7 +38,7 @@ python -m unittest discover -s lessons/06-tui-basics/tests -v
 - `InputBuffer`：不可变的单行文本和光标；
 - `TuiState`：消息、工具卡片、输入与运行状态的显示投影；
 - `reduce_event`：唯一状态转移入口；
-- `TuiRenderer`：固定宽高的纯文本帧；
+- `TuiRenderer`：按 Python 字符数预算固定逻辑宽高的纯文本帧；
 - `TuiApp`：提交一次 prompt，并把 Agent 事件逐帧渲染。
 
 ## 完成证据
@@ -47,7 +47,7 @@ python -m unittest discover -s lessons/06-tui-basics/tests -v
 - 工具开始、成功和失败状态均由同一调用 ID 更新；
 - 视口溢出时隐藏旧显示行，但输入区和状态栏始终存在；
 - TUI 的 `MessageView` 从未进入 `Agent.messages`；
-- 完整演示只使用 FakeModel 和临时目录。
+- 完整 UI 链路测试使用 FakeModel 和临时目录；CLI 演示使用 FakeModel，只读搜索当前仓库 README。
 
 ## 本版不解决
 

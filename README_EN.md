@@ -4,7 +4,7 @@
 
 A Chinese-first, source-grounded, runnable course for building a local coding agent from first principles.
 
-The project starts with an approximately 100-line Python agent and follows a staged path through streaming events, tool execution, terminal interaction, permissions, session recovery, MCP, Skills, extensions, trace replay, and behavioral evaluation. Automated maintenance checks start at 00:00 Asia/Shanghai on odd-numbered calendar days, but the project does not promise a release on each run.
+The project starts with an approximately 100-line Python agent and follows a staged path through streaming events, tool execution, terminal interaction, permissions, session recovery, MCP, Skills, extensions, trace replay, and behavioral evaluation. Releases ship only when their evidence is complete; the automated check schedule is not a release promise.
 
 > This project is inspired by [earendil-works/pi](https://github.com/earendil-works/pi). It is not an official Pi project and is not intended to be a line-by-line Python port.
 
@@ -16,12 +16,16 @@ Current release: [`v0.6.0`, foundations for TUI state and text-frame rendering](
 
 ## Run the latest release
 
-No API key is required:
+Python 3.11 or newer is required. From the repository root, create the project environment; no API key is required:
 
 ```bash
-python lessons/06-tui-basics/snapshot/tui.py
-python -m unittest discover -s lessons/06-tui-basics/tests -v
+python3 -m venv .venv
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
+.venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
+
+The demo prints one deterministic 18-line text frame. Its nominal width is budgeted in Python characters, not Unicode terminal display columns.
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.
 Earlier releases remain independently runnable under [`lessons/`](lessons/README.md).

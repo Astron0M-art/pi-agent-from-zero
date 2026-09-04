@@ -190,7 +190,7 @@ def reduce_event(state: TuiState, event: AgentEvent) -> TuiState:
 
 
 class TuiRenderer:
-    """渲染固定宽高、无 ANSI 的教学帧，便于快照测试。"""
+    """按 Python 字符数渲染固定逻辑宽高、无 ANSI 的教学帧。"""
 
     def __init__(self, *, width: int = 72, height: int = 18) -> None:
         if width < 32:
