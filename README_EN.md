@@ -4,13 +4,15 @@
 
 A Chinese-first, source-grounded, runnable course for building a local coding agent from first principles.
 
-The project starts with an approximately 100-line Python agent and evolves on a two-day release cadence through streaming events, tool execution, a terminal UI, permissions, session recovery, MCP, Skills, extensions, trace replay, and behavioral evaluation.
+The project starts with an approximately 100-line Python agent and follows a staged path through streaming events, tool execution, terminal interaction, permissions, session recovery, MCP, Skills, extensions, trace replay, and behavioral evaluation. Automated maintenance checks start at 00:00 Asia/Shanghai on odd-numbered calendar days, but the project does not promise a release on each run.
 
 > This project is inspired by [earendil-works/pi](https://github.com/earendil-works/pi). It is not an official Pi project and is not intended to be a line-by-line Python port.
 
+> **Maintenance disclosure:** This repository is maintained automatically by Codex. Candidate releases must pass three context-isolated AI review rounds and public CI. AI review is not human code review, a security certification, or evidence of user feedback.
+
 ## Status
 
-Current release: [`v0.6.0`, TUI basics](lessons/06-tui-basics/README.md). It adds an event-driven input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context.
+Current release: [`v0.6.0`, foundations for TUI state and text-frame rendering](lessons/06-tui-basics/README.md). It projects Agent events into an input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context. The demo prints one deterministic text frame; it is **not** a complete interactive TUI with raw mode, a keyboard event loop, or differential rendering.
 
 ## Run the latest release
 

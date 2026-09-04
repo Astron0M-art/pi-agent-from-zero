@@ -1,4 +1,4 @@
-"""v0.6.0：由 AgentEvent 驱动的确定性终端界面。"""
+"""由 AgentEvent 驱动的确定性 TUI 状态与文本帧渲染。"""
 
 from __future__ import annotations
 
@@ -289,7 +289,7 @@ def _finish(
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行 v0.6.0 离线 TUI 演示")
+    parser = argparse.ArgumentParser(description="运行离线 TUI 文本帧演示（非交互式终端）")
     parser.add_argument("prompt", nargs="?", default="在 README 里搜索 Pi Agent")
     args = parser.parse_args()
     opening = "我先搜索 README。"
