@@ -16,10 +16,11 @@ Current release: [`v0.6.0`, foundations for TUI state and text-frame rendering](
 
 ## Run the latest release
 
-Python 3.11 or newer is required. From the repository root, create the project environment; no API key is required:
+The commands below require `python3.11`; you may substitute another interpreter only after confirming it is Python 3.11 or newer. From the repository root, verify the version and create the project environment. No API key is required:
 
 ```bash
-python3 -m venv .venv
+python3.11 --version
+python3.11 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 .venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v

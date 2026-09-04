@@ -16,10 +16,11 @@
 
 ## 5 分钟跑通最新版本
 
-要求本机已安装 Python 3.11 或更高版本，无需 API Key。在仓库根目录先创建项目环境：
+要求本机可以执行 `python3.11`（也可替换成已确认版本不低于 3.11 的解释器），无需 API Key。在仓库根目录先核对版本并创建项目环境：
 
 ```bash
-python3 -m venv .venv
+python3.11 --version
+python3.11 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 ```
