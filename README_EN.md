@@ -82,7 +82,7 @@ pi-agent-from-zero/
 Python 3.11 or newer is required.
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ruff format --check .

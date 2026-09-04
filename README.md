@@ -24,7 +24,7 @@ python3.11 -m venv .venv
 .venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 ```
 
-演示会用离线 FakeModel 搜索仓库 README，并输出一块 18 行的确定性文本帧，不需要 API Key，也不会修改仓库。渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
+演示会用离线 FakeModel 搜索仓库 README，并输出一块 18 行的确定性文本帧，不需要 API Key，也不会修改已跟踪源码或项目数据；解释器可能生成被忽略的 `__pycache__`。渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
 
 ```bash
 .venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
@@ -83,7 +83,7 @@ pi-agent-from-zero/
 要求 Python 3.11 或更高版本。
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ruff format --check .
