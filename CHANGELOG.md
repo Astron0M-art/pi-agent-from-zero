@@ -4,11 +4,14 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-05
+
 ### Changed
 
 - 将首页和课程索引中的 v0.6 能力限定为 TUI 状态与确定性文本帧渲染，明确它不是完整交互式终端。
 - 移除已经失效的固定发版节奏，并披露 Codex 自动维护与三轮上下文隔离 AI 审计的边界。
 - CI 在 Python 3.11 和 3.12 下枚举每个冻结 lesson，要求发现测试后再以隔离进程运行，并为测试任务设置超时；源码包也携带课程材料并在构建后复验。
+- 移除公开文档中的本机绝对路径，并让源码包携带英文入口、Changelog 与引用元数据。
 
 ## [0.6.0] - 2026-09-04
 
@@ -108,7 +111,8 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.4.0

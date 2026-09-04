@@ -12,7 +12,7 @@ The project starts with an approximately 100-line Python agent and follows a sta
 
 ## Status
 
-Current release: [`v0.6.0`, foundations for TUI state and text-frame rendering](lessons/06-tui-basics/README.md). It projects Agent events into an input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context. The demo prints one deterministic text frame; it is **not** a complete interactive TUI with raw mode, a keyboard event loop, or differential rendering.
+Current code version: `v0.6.1`, a credibility maintenance patch whose teaching behavior remains the [`v0.6.0` foundation for TUI state and text-frame rendering](lessons/06-tui-basics/README.md). It projects Agent events into an input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context. The demo prints one deterministic text frame; it is **not** a complete interactive TUI with raw mode, a keyboard event loop, or differential rendering.
 
 ## Run the latest release
 
