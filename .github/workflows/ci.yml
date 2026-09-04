@@ -53,6 +53,17 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip build
       - run: python -m build
+      - name: Verify lessons from the built source distribution
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdist_path=$(find dist -maxdepth 1 -name '*.tar.gz' -print -quit)
+          extract_dir=$(mktemp -d)
+          tar -xzf "$sdist_path" -C "$extract_dir"
+          package_dir=$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)
+          python "$package_dir/scripts/run_lesson_tests.py" \
+            --lessons-dir "$package_dir/lessons" \
+            --timeout-seconds 120
       - uses: actions/upload-artifact@v4
         with:
           name: distributions

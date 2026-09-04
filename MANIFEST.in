@@ -1,1 +1,2 @@
 include scripts/run_lesson_tests.py
+recursive-include lessons *.md *.py *.txt
