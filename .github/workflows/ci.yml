@@ -37,7 +37,17 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: python -m pip install -e '.[dev]'
-      - run: pytest
+      - name: Run current-version tests
+        run: pytest
+      - name: Run frozen lesson tests in isolated processes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test_dir in lessons/*/tests; do
+            echo "::group::$test_dir"
+            python -m unittest discover -s "$test_dir" -v
+            echo "::endgroup::"
+          done
 
   package:
     runs-on: ubuntu-latest
