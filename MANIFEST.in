@@ -1,2 +1,5 @@
+include CHANGELOG.md
+include CITATION.cff
+include README_EN.md
 include scripts/run_lesson_tests.py
 recursive-include lessons *.md *.py *.txt
