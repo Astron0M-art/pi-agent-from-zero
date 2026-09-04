@@ -21,7 +21,6 @@ The commands below require `python3.11`; you may substitute another interpreter 
 ```bash
 python3.11 --version
 python3.11 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 .venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```

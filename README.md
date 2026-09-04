@@ -21,7 +21,6 @@
 ```bash
 python3.11 --version
 python3.11 -m venv .venv
-.venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 ```
 
