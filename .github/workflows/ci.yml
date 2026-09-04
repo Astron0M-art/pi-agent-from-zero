@@ -26,6 +26,7 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -40,14 +41,7 @@ jobs:
       - name: Run current-version tests
         run: pytest
       - name: Run frozen lesson tests in isolated processes
-        shell: bash
-        run: |
-          set -euo pipefail
-          for test_dir in lessons/*/tests; do
-            echo "::group::$test_dir"
-            python -m unittest discover -s "$test_dir" -v
-            echo "::endgroup::"
-          done
+        run: python scripts/run_lesson_tests.py --timeout-seconds 120
 
   package:
     runs-on: ubuntu-latest
