@@ -7,11 +7,7 @@
 - Commit: `1e95e16b61f4a561b932df83d58df52589e58635`
 - License: MIT
 
-本地只读参考路径：
-
-```text
-/Users/astron/pure_code/01-pi_agent
-```
+维护环境可以在仓库外配置本地只读 checkout；它不是读者运行课程所需的依赖，具体机器路径不得提交到公开仓库。
 
 Source Map 必须引用公开仓库路径和符号，不能把本地绝对路径写成读者必须具备的依赖。
 

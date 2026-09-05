@@ -4,26 +4,30 @@
 
 一个中文优先、源码对照、可运行的本地 Coding Agent 教学项目。
 
-本项目从约 100 行 Python Agent 出发，以两天一个教学版本的节奏，逐步加入流式事件、工具系统、TUI、权限控制、会话恢复、MCP、Skills、扩展机制、Trace 回放与评测。
+本项目从约 100 行 Python Agent 出发，按路线逐步加入流式事件、工具系统、终端交互、权限控制、会话恢复、MCP、Skills、扩展机制、Trace 回放与评测。版本成熟后才发布，不以自动检查频率代替质量门禁。
 
 > 本项目受 [earendil-works/pi](https://github.com/earendil-works/pi) 启发，但不是 Pi 官方项目，也不是 Pi 的 Python 移植版。
 
+> **维护透明度：** 本仓库由 Codex 自动维护。候选发布需经过三轮上下文隔离的 AI 审计和公开 CI；AI 审计不等于人工代码审查、安全认证或真实用户反馈。
+
 ## 项目状态
 
-当前版本：[`v0.6.0` TUI 基础](lessons/06-tui-basics/README.md)。新增事件驱动的输入区、消息时间线、工具卡片、固定状态栏和有限视口，并保持显示状态与模型上下文分离。
+当前代码版本：`v0.6.1` 可信度维护版，教学行为仍对应 [`v0.6.0` TUI 状态与文本帧渲染基础](lessons/06-tui-basics/README.md)。它把 Agent 事件投影为输入区、消息时间线、工具卡片、固定状态栏和有限视口，并保持显示状态与模型上下文分离。当前演示只输出一次确定性文本帧，**不是**支持 raw mode、键盘事件循环和差分重绘的完整交互式 TUI。
 
 ## 5 分钟跑通最新版本
 
-无需 API Key。在仓库根目录执行：
+要求本机可以执行 `python3.11`（也可替换成已确认版本不低于 3.11 的解释器），无需 API Key。在仓库根目录先核对版本并创建项目环境：
 
 ```bash
-python lessons/06-tui-basics/snapshot/tui.py
+python3.11 --version
+python3.11 -m venv .venv
+.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
 ```
 
-演示会用离线 FakeModel 搜索仓库 README，并渲染一块固定尺寸的最终终端帧，不需要 API Key，也不会修改仓库。冻结快照的独立测试：
+演示会用离线 FakeModel 搜索仓库 README，并输出一块 18 行的确定性文本帧，不需要 API Key，也不会修改已跟踪源码或项目数据；解释器可能生成被忽略的 `__pycache__`。渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
 
 ```bash
-python -m unittest discover -s lessons/06-tui-basics/tests -v
+.venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
 想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)；旧版本冻结快照不会被最新实现覆盖。
@@ -79,7 +83,7 @@ pi-agent-from-zero/
 要求 Python 3.11 或更高版本。
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ruff format --check .

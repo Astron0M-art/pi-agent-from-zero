@@ -1,4 +1,4 @@
-"""v0.6.0：由 AgentEvent 驱动的确定性终端界面。"""
+"""v0.6.0：由 AgentEvent 驱动的确定性 TUI 状态与文本帧渲染。"""
 
 from __future__ import annotations
 
@@ -190,7 +190,7 @@ def reduce_event(state: TuiState, event: AgentEvent) -> TuiState:
 
 
 class TuiRenderer:
-    """渲染固定宽高、无 ANSI 的教学帧，便于快照测试。"""
+    """按 Python 字符数渲染固定逻辑宽高、无 ANSI 的教学帧。"""
 
     def __init__(self, *, width: int = 72, height: int = 18) -> None:
         if width < 32:
@@ -289,7 +289,7 @@ def _finish(
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行 v0.6.0 离线 TUI 演示")
+    parser = argparse.ArgumentParser(description="运行 v0.6.0 离线 TUI 文本帧演示（非交互式终端）")
     parser.add_argument("prompt", nargs="?", default="在 README 里搜索 Pi Agent")
     args = parser.parse_args()
     opening = "我先搜索 README。"

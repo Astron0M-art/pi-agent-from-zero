@@ -4,22 +4,28 @@
 
 A Chinese-first, source-grounded, runnable course for building a local coding agent from first principles.
 
-The project starts with an approximately 100-line Python agent and evolves on a two-day release cadence through streaming events, tool execution, a terminal UI, permissions, session recovery, MCP, Skills, extensions, trace replay, and behavioral evaluation.
+The project starts with an approximately 100-line Python agent and follows a staged path through streaming events, tool execution, terminal interaction, permissions, session recovery, MCP, Skills, extensions, trace replay, and behavioral evaluation. Releases ship only when their evidence is complete; the automated check schedule is not a release promise.
 
 > This project is inspired by [earendil-works/pi](https://github.com/earendil-works/pi). It is not an official Pi project and is not intended to be a line-by-line Python port.
 
+> **Maintenance disclosure:** This repository is maintained automatically by Codex. Candidate releases must pass three context-isolated AI review rounds and public CI. AI review is not human code review, a security certification, or evidence of user feedback.
+
 ## Status
 
-Current release: [`v0.6.0`, TUI basics](lessons/06-tui-basics/README.md). It adds an event-driven input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context.
+Current code version: `v0.6.1`, a credibility maintenance patch whose teaching behavior remains the [`v0.6.0` foundation for TUI state and text-frame rendering](lessons/06-tui-basics/README.md). It projects Agent events into an input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context. The demo prints one deterministic text frame; it is **not** a complete interactive TUI with raw mode, a keyboard event loop, or differential rendering.
 
 ## Run the latest release
 
-No API key is required:
+The commands below require `python3.11`; you may substitute another interpreter only after confirming it is Python 3.11 or newer. From the repository root, verify the version and create the project environment. No API key is required:
 
 ```bash
-python lessons/06-tui-basics/snapshot/tui.py
-python -m unittest discover -s lessons/06-tui-basics/tests -v
+python3.11 --version
+python3.11 -m venv .venv
+.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
+.venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
+
+The demo prints one deterministic 18-line text frame. Its nominal width is budgeted in Python characters, not Unicode terminal display columns.
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.
 Earlier releases remain independently runnable under [`lessons/`](lessons/README.md).
@@ -76,7 +82,7 @@ pi-agent-from-zero/
 Python 3.11 or newer is required.
 
 ```bash
-python -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e '.[dev]'
 ruff format --check .

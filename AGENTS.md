@@ -2,7 +2,7 @@
 
 ## Scope
 
-Maintain this repository as a Chinese-first, source-grounded teaching project. The upstream reference checkout is `/Users/astron/pure_code/01-pi_agent` and must remain read-only.
+Maintain this repository as a Chinese-first, source-grounded teaching project. A local upstream reference checkout may be configured outside the repository and must remain read-only.
 
 ## Release discipline
 
@@ -19,7 +19,7 @@ Maintain this repository as a Chinese-first, source-grounded teaching project. T
 - Preserve user changes and stage explicit files only.
 - Do not force push, bypass CI, or merge a failing branch.
 - If GitHub authentication or network access fails, keep verified work local and report the blocker.
-- Never edit `/Users/astron/pure_code/01-pi_agent`.
+- Never edit the configured local upstream reference checkout.
 
 ## Quality
 
