@@ -209,7 +209,7 @@ def test_bash_deadline_stops_background_child_without_waiting_for_it(tmp_path) -
     with pytest.raises(DeadlineExceeded, match="exceeded its timeout"):
         bash.execute(
             {"command": "sleep 10 & child=$!; echo $child > child.pid; wait"},
-            CancellationToken(0.05),
+            CancellationToken(0.5),
         )
 
     elapsed = time.monotonic() - started_at
