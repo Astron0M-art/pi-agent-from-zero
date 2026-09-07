@@ -93,6 +93,14 @@ class TuiBasicsTests(unittest.TestCase):
         self.assertIn("INPUT> next|", frame)
         self.assertIn("STATUS> running", frame)
 
+    def test_minimum_viewport_keeps_exact_height(self) -> None:
+        state = TuiState(timeline=tuple(MessageView("assistant", f"line {i}") for i in range(3)))
+
+        frame = TuiRenderer(width=48, height=8).render(state)
+
+        self.assertEqual(len(frame.splitlines()), 8)
+        self.assertIn("earlier entries hidden", frame)
+
     def test_renderer_escapes_terminal_control_sequences(self) -> None:
         state = TuiState(
             timeline=(MessageView("assistant", "safe\x1b]0;owned\x07text"),),

@@ -207,7 +207,11 @@ class TuiRenderer:
         body = self._body_lines(state, inner)
         available = self.height - 7
         if len(body) > available:
-            body = ["... earlier entries hidden ...", *body[-(available - 1) :]]
+            body = (
+                ["... earlier entries hidden ..."]
+                if available == 1
+                else ["... earlier entries hidden ...", *body[-(available - 1) :]]
+            )
         body.extend([""] * (available - len(body)))
 
         lines = [border, self._row("Pi Agent from Zero · TUI", inner), border]
@@ -358,7 +362,7 @@ def parse_tool_command(prompt: str, turn: int) -> tuple[str, ToolCall | None]:
 
 def _ask(operation: str) -> bool:
     try:
-        answer = input(f"允许执行操作 `{operation}` 吗？[y/N] ")
+        answer = input(f"允许执行操作 `{_safe_inline_text(operation)}` 吗？[y/N] ")
     except EOFError:
         print()
         return False

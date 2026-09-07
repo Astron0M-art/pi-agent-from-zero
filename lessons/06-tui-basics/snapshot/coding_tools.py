@@ -53,7 +53,12 @@ class ProjectWorkspace:
         """Write through a stable directory descriptor and reject stale edits."""
 
         parts = self._safe_parts(raw_path)
-        parent_fd = self._open_parent(parts[:-1], create=expected_content is None)
+        try:
+            parent_fd = self._open_parent(parts[:-1], create=expected_content is None)
+        except ToolExecutionError:
+            raise
+        except OSError as error:
+            raise ToolExecutionError(f"could not write file: {error}") from error
         filename = parts[-1]
         temporary = f".pi-agent-{secrets.token_hex(8)}.tmp"
         try:

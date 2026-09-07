@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import re
+import signal
 import subprocess
 import time
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -287,6 +290,7 @@ def create_bash_tool(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                start_new_session=os.name == "posix",
             )
         except OSError as error:
             raise ToolExecutionError(f"could not start command: {error}") from error
@@ -322,11 +326,33 @@ def create_bash_tool(
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
-    if process.poll() is not None:
-        return
-    process.terminate()
+    _signal_process_tree(process, signal.SIGTERM)
     try:
         process.communicate(timeout=0.2)
     except subprocess.TimeoutExpired:
+        _signal_process_tree(process, signal.SIGKILL)
+        try:
+            process.communicate(timeout=0.2)
+        except subprocess.TimeoutExpired:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+            try:
+                process.wait(timeout=0.2)
+            except subprocess.TimeoutExpired as error:
+                raise ToolExecutionError("could not stop command process tree") from error
+
+
+def _signal_process_tree(process: subprocess.Popen[str], requested_signal: int) -> None:
+    process_id = getattr(process, "pid", None)
+    if os.name == "posix" and isinstance(process_id, int):
+        with suppress(ProcessLookupError):
+            os.killpg(process_id, requested_signal)
+        return
+    if process.poll() is not None:
+        return
+    if requested_signal == signal.SIGTERM:
+        process.terminate()
+    else:
         process.kill()
-        process.communicate()

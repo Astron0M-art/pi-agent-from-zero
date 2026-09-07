@@ -103,6 +103,17 @@ def test_renderer_has_fixed_viewport_and_keeps_input_and_status() -> None:
     assert "STATUS> running" in frame
 
 
+def test_renderer_keeps_exact_height_at_minimum_viewport() -> None:
+    state = TuiState(
+        timeline=tuple(MessageView("assistant", f"line {index}") for index in range(3))
+    )
+
+    frame = TuiRenderer(width=48, height=8).render(state)
+
+    assert len(frame.splitlines()) == 8
+    assert "earlier entries hidden" in frame
+
+
 def test_renderer_escapes_terminal_control_sequences() -> None:
     state = TuiState(
         timeline=(MessageView("assistant", "safe\x1b]0;owned\x07text"),),
@@ -291,6 +302,18 @@ def test_repl_exits_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
     tui_module.repl(app)
 
     assert "再见" in capsys.readouterr().out
+
+
+def test_approval_prompt_escapes_terminal_controls(monkeypatch, capsys) -> None:
+    monkeypatch.setattr("builtins.input", lambda prompt: print(prompt, end="") or "n")
+
+    approved = tui_module._ask("bash printf '\x1b]52;clipboard\x07'")
+    output = capsys.readouterr().out
+
+    assert approved is False
+    assert "\x1b" not in output
+    assert "\x07" not in output
+    assert "\\x1b]52;clipboard\\x07" in output
 
 
 def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) -> None:

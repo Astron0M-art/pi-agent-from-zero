@@ -128,6 +128,7 @@ class CodingToolsTests(unittest.TestCase):
                 )
 
                 self.assertTrue(result.is_error)
+                self.assertTrue(result.content.startswith("could not write file:"))
                 self.assertFalse((outside / "escaped.txt").exists())
             finally:
                 outside.rmdir()

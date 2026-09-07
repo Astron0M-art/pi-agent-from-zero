@@ -1,3 +1,5 @@
+import os
+import time
 from collections.abc import Mapping
 
 import pytest
@@ -5,6 +7,7 @@ import pytest
 from pi_agent_from_zero import (
     CancellationRequested,
     CancellationToken,
+    DeadlineExceeded,
     SchemaDefinitionError,
     SchemaValidationError,
     Tool,
@@ -195,3 +198,30 @@ def test_bash_interrupt_stops_child_before_propagating(monkeypatch, tmp_path) ->
 
     assert process.terminated is True
     assert process.communicate_calls == 2
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process-group semantics are POSIX-specific")
+def test_bash_deadline_stops_background_child_without_waiting_for_it(tmp_path) -> None:
+    child_pid_file = tmp_path / "child.pid"
+    bash = create_bash_tool(lambda _command: True, cwd=tmp_path)
+    started_at = time.monotonic()
+
+    with pytest.raises(DeadlineExceeded, match="exceeded its timeout"):
+        bash.execute(
+            {"command": "sleep 10 & child=$!; echo $child > child.pid; wait"},
+            CancellationToken(0.05),
+        )
+
+    elapsed = time.monotonic() - started_at
+    child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+    child_stopped = False
+    for _ in range(20):
+        try:
+            os.kill(child_pid, 0)
+        except ProcessLookupError:
+            child_stopped = True
+            break
+        time.sleep(0.01)
+
+    assert elapsed < 1
+    assert child_stopped is True

@@ -38,7 +38,7 @@ y
 /exit
 ```
 
-这条路径同时验证多轮上下文、Coding Tools、Bash 审批、事件流和 TUI 文本帧。离线 Provider 只用于观察控制流，回答质量不代表真实模型。`/write <path> <content>` 和 `/edit <path> <old> <new>` 也可使用，但会请求审批；read、grep、write、edit 的文件路径被限制在启动时的工作目录内。Bash 只把该目录作为初始 cwd，获批命令仍可访问目录外部，它不是沙箱。原来的一次性 README 搜索演示保留为 `.venv/bin/pi-agent-zero --demo`。
+这条路径同时验证多轮上下文、Coding Tools、Bash 审批、事件流和 TUI 文本帧。离线 Provider 只用于观察控制流，回答质量不代表真实模型。`/write <path> <content>` 和 `/edit <path> <old> <new>` 也可使用，但会请求审批；read、grep、write、edit 会校验路径是否位于启动时的工作目录，写入还会在审批后重新验证。它不是对恶意并发文件系统变更的完整沙箱。Bash 只把该目录作为初始 cwd，获批命令仍可访问目录外部。原来的一次性 README 搜索演示保留为 `.venv/bin/pi-agent-zero --demo`。
 
 渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
 

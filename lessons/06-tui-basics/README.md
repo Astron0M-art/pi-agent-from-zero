@@ -23,7 +23,7 @@
 .venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
-第一条命令会进入持续输入循环。依次输入普通文字、`/read README.md`、`/bash pwd`、`y` 和 `/exit`，可以看到每一轮最终的 18 行文本帧；Unicode 字符实际占用的终端显示列可能更多。第二条命令应显示 6 个测试全部通过。
+第一条命令会进入持续输入循环。依次输入普通文字、`/read README.md`、`/bash pwd`、`y` 和 `/exit`，可以看到每一轮最终的 18 行文本帧；Unicode 字符实际占用的终端显示列可能更多。第二条命令应显示 7 个测试全部通过。
 
 ## 阅读顺序
 

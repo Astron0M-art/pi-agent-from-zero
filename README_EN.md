@@ -27,7 +27,7 @@ python3.11 -m venv .venv
 .venv/bin/pi-agent-zero
 ```
 
-Try `hello`, `/read README.md`, `/grep "Pi Agent" README.md`, `/bash pwd`, approve with `y`, and then `/exit`. This path combines conversation history, coding tools, approval, event streaming, and text-frame rendering. The offline Provider demonstrates control flow only, not model quality. File paths for read, grep, write, and edit stay within the startup working directory. Bash only starts there; an approved command can reach outside it, so this is not a sandbox. The former one-shot README search remains available as `pi-agent-zero --demo`.
+Try `hello`, `/read README.md`, `/grep "Pi Agent" README.md`, `/bash pwd`, approve with `y`, and then `/exit`. This path combines conversation history, coding tools, approval, event streaming, and text-frame rendering. The offline Provider demonstrates control flow only, not model quality. Read, grep, write, and edit validate paths against the startup working directory; writes revalidate after approval. This is not a sandbox against hostile concurrent filesystem mutation. Bash only starts in that directory, and an approved command can reach outside it. The former one-shot README search remains available as `pi-agent-zero --demo`.
 
 The frame's nominal width is budgeted in Python characters, not Unicode terminal display columns.
 

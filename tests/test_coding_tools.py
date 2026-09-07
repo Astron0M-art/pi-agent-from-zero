@@ -108,6 +108,7 @@ def test_write_rejects_parent_symlink_swapped_during_approval(tmp_path: Path) ->
         )
 
         assert result.is_error is True
+        assert result.content.startswith("could not write file:")
         assert not (outside / "escaped.txt").exists()
     finally:
         outside.rmdir()

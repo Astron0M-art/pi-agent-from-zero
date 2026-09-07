@@ -9,7 +9,7 @@
 | Message、ToolCall ID 与 Provider 边界 |  | ✓ | ✓ | ✓ | ✓ | ✓ |
 | 流式事件、取消与超时协议 |  |  | ✓ | ✓ | ✓ | ✓ |
 | Tool Registry、Schema 与双重预算 |  |  |  | ✓ | ✓ | ✓ |
-| read / write / edit / grep 与项目路径边界 |  |  |  |  | ✓ | ✓ |
+| read / write / edit / grep 与项目路径校验 |  |  |  |  | ✓ | ✓ |
 | TUI 状态、文本帧与工具卡片 |  |  |  |  |  | ✓ |
 
 ## 可执行证据
