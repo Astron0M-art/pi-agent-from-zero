@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import textwrap
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -296,16 +297,9 @@ class ReplProvider:
             result = current_turn[-1]
             text = f"第 {len(user_indexes)} 轮完成，{result.tool_name} 返回：\n{result.content}"
             reply = AssistantMessage(text)
-        elif prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
-            command = prompt.removeprefix("/bash ").strip()
-            text = f"第 {len(user_indexes)} 轮请求 Bash。"
-            reply = AssistantMessage(
-                text,
-                (ToolCall(f"bash-{len(user_indexes)}", "bash", {"command": command}),),
-            )
-        elif prompt.strip() == "/bash":
-            text = "用法：/bash <command>"
-            reply = AssistantMessage(text)
+        elif prompt.startswith("/"):
+            text, call = parse_tool_command(prompt, len(user_indexes))
+            reply = AssistantMessage(text, (call,) if call else ())
         else:
             text = f"离线模型收到第 {len(user_indexes)} 轮：{prompt}"
             reply = AssistantMessage(text)
@@ -313,9 +307,45 @@ class ReplProvider:
         yield ProviderCompleted(reply)
 
 
+def parse_tool_command(prompt: str, turn: int) -> tuple[str, ToolCall | None]:
+    """把斜杠命令转换为可显示、可审批、可关联的 ToolCall。"""
+
+    if prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+        command = prompt.removeprefix("/bash ").strip()
+        return f"第 {turn} 轮请求 bash。", ToolCall(f"bash-{turn}", "bash", {"command": command})
+    try:
+        parts = shlex.split(prompt)
+    except ValueError as error:
+        return f"命令解析失败：{error}", None
+    if len(parts) == 2 and parts[0] == "/read":
+        return f"第 {turn} 轮请求 read。", ToolCall(f"read-{turn}", "read", {"path": parts[1]})
+    if len(parts) in {2, 3} and parts[0] == "/grep":
+        arguments = {"query": parts[1]}
+        if len(parts) == 3:
+            arguments["path"] = parts[2]
+        return f"第 {turn} 轮请求 grep。", ToolCall(f"grep-{turn}", "grep", arguments)
+    if len(parts) >= 3 and parts[0] == "/write":
+        return f"第 {turn} 轮请求 write。", ToolCall(
+            f"write-{turn}",
+            "write",
+            {"path": parts[1], "content": " ".join(parts[2:])},
+        )
+    if len(parts) == 4 and parts[0] == "/edit":
+        return f"第 {turn} 轮请求 edit。", ToolCall(
+            f"edit-{turn}",
+            "edit",
+            {"path": parts[1], "old_text": parts[2], "new_text": parts[3]},
+        )
+    return (
+        "工具命令：/read <path>；/grep <query> [path]；"
+        "/write <path> <content>；/edit <path> <old> <new>；/bash <command>",
+        None,
+    )
+
+
 def _ask(operation: str) -> bool:
     try:
-        answer = input(f"允许执行 bash 命令 `{operation}` 吗？[y/N] ")
+        answer = input(f"允许执行操作 `{operation}` 吗？[y/N] ")
     except (EOFError, KeyboardInterrupt):
         print()
         return False
@@ -334,7 +364,7 @@ def _run_turn(app: TuiApp, prompt: str) -> None:
 
 def repl(app: TuiApp) -> None:
     print("Pi Agent from Zero v0.6 · TUI 状态与文本帧")
-    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    print("连续对话；/read、/grep、/write、/edit、/bash 调用工具；/exit 退出。")
     while True:
         try:
             prompt = input("Pi Agent > ")

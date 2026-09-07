@@ -177,6 +177,27 @@ def test_default_cli_keeps_context_across_chat_bash_and_chat(tmp_path: Path) -> 
     assert "再见" in result.stdout
 
 
+def test_default_cli_combines_coding_tools_in_one_session(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [_console_script()],
+        cwd=tmp_path,
+        input=(
+            "/write note.txt alpha\ny\n/read note.txt\n"
+            "/edit note.txt alpha beta\ny\n/grep beta note.txt\n/exit\n"
+        ),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert (tmp_path / "note.txt").read_text(encoding="utf-8") == "beta"
+    assert "第 1 轮完成，write 返回" in result.stdout
+    assert "第 2 轮完成，read 返回" in result.stdout
+    assert "第 3 轮完成，edit 返回" in result.stdout
+    assert "note.txt:1:beta" in result.stdout
+
+
 def test_repl_exits_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
     agent = Agent(FakeModel([]), ToolRegistry([]))
     app = TuiApp(agent)

@@ -15,6 +15,7 @@ LESSON_ENTRIES = (
     ("v0.5", PROJECT_ROOT / "lessons/05-coding-tools/snapshot/agent.py"),
     ("v0.6", PROJECT_ROOT / "lessons/06-tui-basics/snapshot/tui.py"),
 )
+CODING_TOOL_ENTRIES = LESSON_ENTRIES[-2:]
 
 
 def _run(entry: Path, transcript: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -74,3 +75,22 @@ def test_every_version_exits_cleanly_on_eof(version: str, entry: Path, tmp_path:
     assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
     assert "Pi Agent > " in result.stdout
     assert "再见" in result.stdout
+
+
+@pytest.mark.parametrize(("version", "entry"), CODING_TOOL_ENTRIES)
+def test_v05_and_later_combine_chat_with_project_tools(
+    version: str, entry: Path, tmp_path: Path
+) -> None:
+    result = _run(
+        entry,
+        "/write note.txt alpha\ny\n/read note.txt\n"
+        "/edit note.txt alpha beta\ny\n/grep beta note.txt\n/exit\n",
+        tmp_path,
+    )
+
+    assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
+    assert (tmp_path / "note.txt").read_text(encoding="utf-8") == "beta"
+    assert "第 1 轮完成，write 返回" in result.stdout
+    assert "第 2 轮完成，read 返回" in result.stdout
+    assert "第 3 轮完成，edit 返回" in result.stdout
+    assert "note.txt:1:beta" in result.stdout
