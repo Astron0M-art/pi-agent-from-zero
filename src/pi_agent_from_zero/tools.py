@@ -296,6 +296,9 @@ def create_bash_tool(
             try:
                 stdout, stderr = process.communicate(timeout=0.05)
                 break
+            except KeyboardInterrupt:
+                _stop_process(process)
+                raise
             except subprocess.TimeoutExpired:
                 try:
                     cancellation.checkpoint()
@@ -318,6 +321,8 @@ def create_bash_tool(
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
     process.terminate()
     try:
         process.communicate(timeout=0.2)

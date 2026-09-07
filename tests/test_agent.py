@@ -1,4 +1,5 @@
-from collections.abc import Iterator
+import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import pytest
@@ -182,6 +183,44 @@ def test_provider_failures_have_explicit_terminal_event(stream: list, kind: str)
 
     assert isinstance(events[-1], AgentFailed)
     assert events[-1].kind == kind
+    assert agent.messages == [UserMessage("开始")]
+
+
+class DirectProvider:
+    provider_id = "direct-test"
+
+    def __init__(self, events: Iterable) -> None:
+        self.events = events
+
+    def stream(self, _request: ModelRequest, _token: CancellationToken) -> Iterable:
+        return self.events
+
+
+def test_provider_cannot_emit_after_terminal_event() -> None:
+    provider = DirectProvider(
+        [ProviderCompleted(AssistantMessage("done")), ProviderTextDelta("too late")]
+    )
+    agent = Agent(provider, ToolRegistry([]))
+
+    events = list(agent.stream("开始"))
+
+    assert events[-1] == AgentFailed(
+        "protocol", "provider emitted an event after its terminal event"
+    )
+    assert agent.messages == [UserMessage("开始")]
+
+
+def test_deadline_is_checked_after_provider_generator_finishes() -> None:
+    def slow_after_terminal() -> Iterator[ProviderCompleted]:
+        yield ProviderCompleted(AssistantMessage("late"))
+        time.sleep(0.01)
+
+    agent = Agent(DirectProvider(slow_after_terminal()), ToolRegistry([]))
+
+    events = list(agent.stream("开始", timeout_seconds=0.001))
+
+    assert isinstance(events[-1], AgentFailed)
+    assert events[-1].kind == "timeout"
     assert agent.messages == [UserMessage("开始")]
 
 

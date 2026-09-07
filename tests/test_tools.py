@@ -14,8 +14,10 @@ from pi_agent_from_zero import (
     ToolOutcome,
     ToolRegistry,
     ToolResultMessage,
+    create_bash_tool,
     validate_arguments,
 )
+from pi_agent_from_zero import tools as tools_module
 
 
 def definition(name: str = "echo") -> ToolDefinition:
@@ -159,3 +161,37 @@ def test_cancellation_is_not_downgraded_to_tool_error() -> None:
 
     with pytest.raises(CancellationRequested, match="stop the run"):
         registry.execute(ToolCall("cancel-1", "echo", {"message": "x"}), CancellationToken())
+
+
+def test_bash_interrupt_stops_child_before_propagating(monkeypatch, tmp_path) -> None:
+    class InterruptedProcess:
+        returncode = -15
+
+        def __init__(self) -> None:
+            self.terminated = False
+            self.communicate_calls = 0
+
+        def communicate(self, timeout=None):
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                raise KeyboardInterrupt
+            return "", ""
+
+        def poll(self):
+            return None if not self.terminated else self.returncode
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.terminated = True
+
+    process = InterruptedProcess()
+    monkeypatch.setattr(tools_module.subprocess, "Popen", lambda *_args, **_kwargs: process)
+    bash = create_bash_tool(lambda _command: True, cwd=tmp_path)
+
+    with pytest.raises(KeyboardInterrupt):
+        bash.execute({"command": "sleep 5"}, CancellationToken())
+
+    assert process.terminated is True
+    assert process.communicate_calls == 2

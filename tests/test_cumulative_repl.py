@@ -227,6 +227,12 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
         "ProviderCompleted(AssistantMessage('b'))]]))\n"
         "bad_events = list(bad.stream('bad'))\n"
         "print(bad_events[-1].kind, len(bad.messages))\n"
+        "def after_terminal(_request, _token):\n"
+        "    yield ProviderCompleted(AssistantMessage('done'))\n"
+        "    yield ProviderTextDelta('too late')\n"
+        "post = make(DirectProvider(after_terminal))\n"
+        "post_events = list(post.stream('post'))\n"
+        "print(post_events[-1].kind, len(post.messages))\n"
         f"{tool_timeout_program}"
     )
     result = subprocess.run(
@@ -244,6 +250,7 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
         "timeout 0",
         "cancelled 1",
         "timeout 1",
+        "protocol 1",
         "protocol 1",
     ]
     if uses_registry:

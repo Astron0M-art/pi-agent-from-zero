@@ -84,14 +84,19 @@ class Agent:
         request = ModelRequest(tuple(self.messages), self.tools.definitions)
         deltas: list[str] = []
         completed: AssistantMessage | None = None
+        terminal_seen = False
         for event in self.provider.stream(request, token):
             token.checkpoint()
+            if terminal_seen:
+                raise ProtocolError("provider emitted an event after its terminal event")
             if isinstance(event, ProviderTextDelta):
                 deltas.append(event.delta)
                 yield TextDelta(event.delta)
             elif isinstance(event, ProviderCompleted):
                 completed = event.message
+                terminal_seen = True
             elif isinstance(event, ProviderFailed):
+                terminal_seen = True
                 if event.kind == "cancelled":
                     raise Cancelled(event.message)
                 raise RuntimeError(event.message)

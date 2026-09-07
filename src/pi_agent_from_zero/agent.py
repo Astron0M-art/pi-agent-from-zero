@@ -179,6 +179,7 @@ class Agent:
         except Exception as error:
             raise _ProviderError(str(error)) from error
 
+        cancellation.checkpoint()
         if completed is None:
             raise _ProtocolError("provider stream ended without a terminal event")
         streamed_text = "".join(deltas)
