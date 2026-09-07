@@ -112,6 +112,7 @@ class Agent:
                     result = self.tools.execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
+                    token.checkpoint()
 
             token.checkpoint()
             raise _BudgetError(f"agent exceeded {self.max_turns} turns")

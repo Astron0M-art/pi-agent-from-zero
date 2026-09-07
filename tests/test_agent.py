@@ -321,3 +321,24 @@ def test_tool_call_budget_stops_before_extra_side_effect(tmp_path: Path) -> None
     assert not (tmp_path / "forbidden").exists()
     assert events[-1] == AgentFailed("budget", "agent exceeded 1 tool calls")
     assert ToolStarted(calls[1]) not in events
+
+
+def test_cancellation_after_tool_completed_prevents_next_provider_call(tmp_path: Path) -> None:
+    fake = FakeModel(
+        [
+            completed(AssistantMessage(tool_calls=(bash_call("true"),))),
+            completed(AssistantMessage("must not be requested")),
+        ]
+    )
+    cancellation = CancellationToken()
+    events = Agent(fake, bash_registry(cwd=tmp_path)).stream("运行", cancellation=cancellation)
+    observed = []
+    for event in events:
+        observed.append(event)
+        if isinstance(event, ToolCompleted):
+            cancellation.cancel("stop after tool")
+            break
+    observed.extend(events)
+
+    assert observed[-1] == AgentFailed("cancelled", "stop after tool")
+    assert len(fake.requests) == 1

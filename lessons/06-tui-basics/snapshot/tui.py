@@ -255,7 +255,9 @@ def _safe_inline_text(content: str) -> str:
     """Make terminal controls visible instead of letting content execute them."""
 
     return "".join(
-        character if ord(character) >= 32 and ord(character) != 127 else f"\\x{ord(character):02x}"
+        character
+        if ord(character) >= 32 and not 127 <= ord(character) <= 159
+        else f"\\x{ord(character):02x}"
         for character in content
     )
 

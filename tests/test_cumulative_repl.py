@@ -453,6 +453,59 @@ def test_v04_and_later_cancel_before_unknown_tool_lookup(version: str, entry: Pa
     assert result.stdout.strip() == "Cancelled"
 
 
+@pytest.mark.parametrize(("version", "entry"), STREAMING_ENTRIES)
+def test_v03_and_later_stop_before_provider_after_tool_completed(version: str, entry: Path) -> None:
+    if version == "v0.3":
+        tools_import = ""
+        constructor = "Agent(fake, lambda _command: True)"
+    else:
+        tools_import = "from tools import ToolRegistry, create_bash_tool\n"
+        constructor = (
+            "Agent(fake, ToolRegistry([create_bash_tool(lambda _command: True, Path.cwd())]))"
+        )
+    program = (
+        "import time\n"
+        "from pathlib import Path\n"
+        "from agent import Agent\n"
+        "from events import CancellationToken, ProviderCompleted, ToolCompleted\n"
+        "from messages import AssistantMessage, ToolCall\n"
+        "from providers import FakeModel\n"
+        f"{tools_import}"
+        "def run(mode):\n"
+        "    reply = AssistantMessage(tool_calls=(ToolCall('bash-1', 'bash', "
+        "{'command': 'true'}),))\n"
+        "    global fake\n"
+        "    fake = FakeModel([[ProviderCompleted(reply)], "
+        "[ProviderCompleted(AssistantMessage('must not run'))]])\n"
+        "    token = CancellationToken(None if mode == 'cancel' else 0.01)\n"
+        f"    agent = {constructor}\n"
+        "    events = agent.stream('tool', cancellation=token)\n"
+        "    seen = []\n"
+        "    for event in events:\n"
+        "        seen.append(event)\n"
+        "        if isinstance(event, ToolCompleted):\n"
+        "            if mode == 'cancel': token.cancel('stop after tool')\n"
+        "            else: time.sleep(0.02)\n"
+        "            break\n"
+        "    seen.extend(events)\n"
+        "    print(seen[-1].kind, len(fake.requests))\n"
+        "run('cancel')\n"
+        "run('timeout')\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=entry.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
+    assert result.stdout.splitlines() == ["cancelled 1", "timeout 1"]
+
+
 @pytest.mark.parametrize(("version", "entry"), CODING_TOOL_ENTRIES)
 def test_v05_and_later_combine_chat_with_project_tools(
     version: str, entry: Path, tmp_path: Path

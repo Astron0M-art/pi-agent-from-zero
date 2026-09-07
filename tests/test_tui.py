@@ -116,7 +116,7 @@ def test_renderer_keeps_exact_height_at_minimum_viewport() -> None:
 
 def test_renderer_escapes_terminal_control_sequences() -> None:
     state = TuiState(
-        timeline=(MessageView("assistant", "safe\x1b]0;owned\x07text"),),
+        timeline=(MessageView("assistant", "safe\x1b]0;owned\x07\x9btext"),),
         status_detail="bad\x1b[2Jstatus",
     )
 
@@ -124,7 +124,8 @@ def test_renderer_escapes_terminal_control_sequences() -> None:
 
     assert "\x1b" not in frame
     assert "\x07" not in frame
-    assert "\\x1b]0;owned\\x07" in frame
+    assert "\x9b" not in frame
+    assert "\\x1b]0;owned\\x07\\x9b" in frame
     assert "\\x1b[2J" in frame
 
 

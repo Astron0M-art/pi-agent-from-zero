@@ -103,7 +103,7 @@ class TuiBasicsTests(unittest.TestCase):
 
     def test_renderer_escapes_terminal_control_sequences(self) -> None:
         state = TuiState(
-            timeline=(MessageView("assistant", "safe\x1b]0;owned\x07text"),),
+            timeline=(MessageView("assistant", "safe\x1b]0;owned\x07\x9btext"),),
             status_detail="bad\x1b[2Jstatus",
         )
 
@@ -111,7 +111,8 @@ class TuiBasicsTests(unittest.TestCase):
 
         self.assertNotIn("\x1b", frame)
         self.assertNotIn("\x07", frame)
-        self.assertIn("\\x1b]0;owned\\x07", frame)
+        self.assertNotIn("\x9b", frame)
+        self.assertIn("\\x1b]0;owned\\x07\\x9b", frame)
         self.assertIn("\\x1b[2J", frame)
 
     def test_fake_model_drives_complete_tui_without_paid_api(self) -> None:
