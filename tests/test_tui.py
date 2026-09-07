@@ -1,3 +1,5 @@
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -134,3 +136,32 @@ def test_tui_app_projects_agent_events_without_changing_model_history(tmp_path: 
 def test_renderer_rejects_unusable_viewport(width: int, height: int) -> None:
     with pytest.raises(ValueError):
         TuiRenderer(width=width, height=height)
+
+
+def test_module_cli_reports_success_when_demo_readme_exists() -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "pi_agent_from_zero"],
+        cwd=Path(__file__).parents[1],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "[SUCCEEDED] grep" in result.stdout
+    assert "STATUS> completed" in result.stdout
+
+
+def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "pi_agent_from_zero"],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "[FAILED] grep" in result.stdout
+    assert "STATUS> failed" in result.stdout
+    assert "STATUS> completed" not in result.stdout
