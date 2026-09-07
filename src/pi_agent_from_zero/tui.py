@@ -33,6 +33,9 @@ UiRole = Literal["user", "assistant"]
 ToolCardStatus = Literal["running", "succeeded", "failed"]
 RunStatus = Literal["idle", "running", "completed", "failed"]
 
+_REQUIRED_DEMO_CALL_ID = "grep-1"
+_NO_GREP_MATCHES = "(no matches)"
+
 
 @dataclass(frozen=True, slots=True)
 class InputBuffer:
@@ -281,9 +284,39 @@ def _finish(
     del cancellation
     result = request.messages[-1]
     assert isinstance(result, ToolResultMessage)
-    text = "找到 README 中的项目标题。" if not result.is_error else "搜索失败。"
+    if result.is_error:
+        text = "搜索失败。"
+    elif result.content.strip() == _NO_GREP_MATCHES:
+        text = "README 中没有找到项目标题。"
+    else:
+        text = "找到 README 中的项目标题。"
     yield ProviderTextDelta(text)
     yield ProviderCompleted(AssistantMessage(text))
+
+
+def _finalize_demo_state(state: TuiState) -> tuple[TuiState, int]:
+    """Validate this scripted demo's one required grep result."""
+
+    if state.status == "failed":
+        return state, 1
+    if state.status != "completed":
+        return reduce_event(state, AgentFailed("runtime", "demo did not terminate")), 1
+
+    required = next(
+        (card for card in state.tool_cards if card.call_id == _REQUIRED_DEMO_CALL_ID),
+        None,
+    )
+    if required is None:
+        detail = "required grep result is missing"
+    elif required.status == "failed":
+        detail = "required grep tool failed"
+    elif required.status != "succeeded":
+        detail = "required grep tool did not finish"
+    elif required.output.strip() == _NO_GREP_MATCHES:
+        detail = "required grep found no matches"
+    else:
+        return state, 0
+    return reduce_event(state, AgentFailed("runtime", detail)), 1
 
 
 def main() -> None:
@@ -314,8 +347,11 @@ def main() -> None:
     )
     app = TuiApp(agent)
     app.type_text(args.prompt)
-    frames = list(app.frames())
-    print(frames[-1])
+    list(app.frames())
+    app.state, exit_code = _finalize_demo_state(app.state)
+    print(app.renderer.render(app.state))
+    if exit_code:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":
