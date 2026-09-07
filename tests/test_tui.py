@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import pi_agent_from_zero.tui as tui_module
 from pi_agent_from_zero import (
     Agent,
     AgentCompleted,
@@ -138,9 +139,15 @@ def test_renderer_rejects_unusable_viewport(width: int, height: int) -> None:
         TuiRenderer(width=width, height=height)
 
 
+def _console_script() -> Path:
+    script = Path(sys.executable).with_name("pi-agent-zero")
+    assert script.is_file(), "install the project before running its CLI tests"
+    return script
+
+
 def test_module_cli_reports_success_when_demo_readme_exists() -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "pi_agent_from_zero"],
+        [_console_script()],
         cwd=Path(__file__).parents[1],
         check=False,
         capture_output=True,
@@ -154,7 +161,7 @@ def test_module_cli_reports_success_when_demo_readme_exists() -> None:
 
 def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) -> None:
     result = subprocess.run(
-        [sys.executable, "-m", "pi_agent_from_zero"],
+        [_console_script()],
         cwd=tmp_path,
         check=False,
         capture_output=True,
@@ -165,3 +172,53 @@ def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) 
     assert "[FAILED] grep" in result.stdout
     assert "STATUS> failed" in result.stdout
     assert "STATUS> completed" not in result.stdout
+
+
+def test_module_cli_reports_failure_when_required_grep_has_no_matches(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "README.md").write_text("unrelated project\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [_console_script()],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "[SUCCEEDED] grep" in result.stdout
+    assert "(no matches)" in result.stdout
+    assert "README 中没有找到项目标题。" in result.stdout
+    assert "STATUS> failed" in result.stdout
+
+
+def test_demo_finalizer_ignores_optional_failure_after_required_success() -> None:
+    state = TuiState(
+        timeline=(
+            ToolCard("read-optional", "read", {}, "failed", "optional failure"),
+            ToolCard("grep-1", "grep", {}, "succeeded", "Pi Agent from Zero"),
+        ),
+        status="completed",
+        status_detail="Task completed",
+    )
+
+    final_state, exit_code = tui_module._finalize_demo_state(state)
+
+    assert final_state is state
+    assert exit_code == 0
+
+
+def test_demo_finalizer_preserves_existing_terminal_failure() -> None:
+    state = TuiState(
+        timeline=(ToolCard("grep-1", "grep", {}, "failed", "missing"),),
+        status="failed",
+        status_detail="timeout: deadline exceeded",
+    )
+
+    final_state, exit_code = tui_module._finalize_demo_state(state)
+
+    assert final_state is state
+    assert final_state.status_detail == "timeout: deadline exceeded"
+    assert exit_code == 1
