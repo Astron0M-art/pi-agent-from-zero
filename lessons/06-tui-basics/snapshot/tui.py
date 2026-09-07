@@ -25,8 +25,8 @@ from events import (
     ToolCompleted,
     ToolStarted,
 )
-from messages import AssistantMessage, ToolCall, ToolResultMessage
-from providers import FakeModel, ModelRequest
+from messages import AssistantMessage, ToolCall, ToolResultMessage, UserMessage
+from providers import ModelRequest
 from tools import ToolRegistry
 
 UiRole = Literal["user", "assistant"]
@@ -257,7 +257,7 @@ def _wrap(prefix: str, content: str, width: int) -> list[str]:
 
 
 class TuiApp:
-    """连接输入区、Agent 事件流和渲染器；本版一次只运行一个 prompt。"""
+    """连接输入区、Agent 事件流和渲染器，并在多轮间保留状态。"""
 
     def __init__(self, agent: Agent, renderer: TuiRenderer | None = None) -> None:
         self.agent = agent
@@ -275,43 +275,93 @@ class TuiApp:
             yield self.renderer.render(self.state)
 
 
-def _finish(
-    request: ModelRequest, cancellation: CancellationToken
-) -> Iterator[ProviderTextDelta | ProviderCompleted]:
-    del cancellation
-    result = request.messages[-1]
-    assert isinstance(result, ToolResultMessage)
-    text = "找到 README 中的项目标题。" if not result.is_error else "搜索失败。"
-    yield ProviderTextDelta(text)
-    yield ProviderCompleted(AssistantMessage(text))
+class ReplProvider:
+    """确定性离线 Provider：普通对话回显，``/bash`` 走工具事件。"""
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def stream(self, request: ModelRequest, cancellation: CancellationToken):
+        self.requests.append(request)
+        cancellation.checkpoint()
+        user_indexes = [
+            index
+            for index, message in enumerate(request.messages)
+            if isinstance(message, UserMessage)
+        ]
+        latest_user_index = user_indexes[-1]
+        prompt = request.messages[latest_user_index].content
+        current_turn = request.messages[latest_user_index:]
+        if isinstance(current_turn[-1], ToolResultMessage):
+            result = current_turn[-1]
+            text = f"第 {len(user_indexes)} 轮完成，{result.tool_name} 返回：\n{result.content}"
+            reply = AssistantMessage(text)
+        elif prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+            command = prompt.removeprefix("/bash ").strip()
+            text = f"第 {len(user_indexes)} 轮请求 Bash。"
+            reply = AssistantMessage(
+                text,
+                (ToolCall(f"bash-{len(user_indexes)}", "bash", {"command": command}),),
+            )
+        elif prompt.strip() == "/bash":
+            text = "用法：/bash <command>"
+            reply = AssistantMessage(text)
+        else:
+            text = f"离线模型收到第 {len(user_indexes)} 轮：{prompt}"
+            reply = AssistantMessage(text)
+        yield ProviderTextDelta(text)
+        yield ProviderCompleted(reply)
+
+
+def _ask(operation: str) -> bool:
+    try:
+        answer = input(f"允许执行 bash 命令 `{operation}` 吗？[y/N] ")
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    return answer.strip().lower() in {"y", "yes"}
+
+
+def _run_turn(app: TuiApp, prompt: str) -> None:
+    existing_cards = len(app.state.tool_cards)
+    app.type_text(prompt)
+    frames = list(app.frames())
+    for card in app.state.tool_cards[existing_cards:]:
+        print(f"TOOL> {card.output}")
+    if frames:
+        print(frames[-1])
+
+
+def repl(app: TuiApp) -> None:
+    print("Pi Agent from Zero v0.6 · TUI 状态与文本帧")
+    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        _run_turn(app, prompt)
 
 
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行 v0.6.0 离线 TUI 文本帧演示（非交互式终端）")
-    parser.add_argument("prompt", nargs="?", default="在 README 里搜索 Pi Agent")
+    parser = argparse.ArgumentParser(description="运行 v0.6.0 多轮 TUI 文本帧")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
     args = parser.parse_args()
-    opening = "我先搜索 README。"
-    fake = FakeModel(
-        [
-            [
-                ProviderTextDelta(opening),
-                ProviderCompleted(
-                    AssistantMessage(
-                        opening,
-                        (ToolCall("grep-1", "grep", {"query": "Pi Agent", "path": "README.md"}),),
-                    )
-                ),
-            ],
-            _finish,
-        ]
-    )
-    agent = Agent(fake, ToolRegistry(create_coding_tools(Path.cwd(), lambda _operation: False)))
+    agent = Agent(ReplProvider(), ToolRegistry(create_coding_tools(Path.cwd(), _ask)))
     app = TuiApp(agent)
-    app.type_text(args.prompt)
-    frames = list(app.frames())
-    print(frames[-1])
+    if args.prompt is not None:
+        _run_turn(app, args.prompt)
+        return
+    repl(app)
 
 
 if __name__ == "__main__":

@@ -21,14 +21,14 @@ from events import (
     ToolStarted,
 )
 from messages import AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage
-from providers import FakeModel, ModelRequest
+from providers import FakeModel, ModelRequest, Provider
 from tools import ToolRegistry
 
 
 class Agent:
     def __init__(
         self,
-        provider: FakeModel,
+        provider: Provider,
         tools: ToolRegistry,
         *,
         max_turns: int = 8,

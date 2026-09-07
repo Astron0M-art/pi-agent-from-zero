@@ -68,9 +68,7 @@ def test_every_version_denies_bash_without_ending_the_conversation(
 
 
 @pytest.mark.parametrize(("version", "entry"), LESSON_ENTRIES)
-def test_every_version_exits_cleanly_on_eof(
-    version: str, entry: Path, tmp_path: Path
-) -> None:
+def test_every_version_exits_cleanly_on_eof(version: str, entry: Path, tmp_path: Path) -> None:
     result = _run(entry, "", tmp_path)
 
     assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"

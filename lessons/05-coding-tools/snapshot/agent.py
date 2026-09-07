@@ -21,14 +21,14 @@ from events import (
     ToolStarted,
 )
 from messages import AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage
-from providers import FakeModel, ModelRequest
+from providers import ModelRequest, Provider
 from tools import ToolRegistry
 
 
 class Agent:
     def __init__(
         self,
-        provider: FakeModel,
+        provider: Provider,
         tools: ToolRegistry,
         *,
         max_turns: int = 8,
@@ -88,42 +88,94 @@ class Agent:
 
 
 def ask(operation: str) -> bool:
-    return input(f"允许执行 `{operation}` 吗？[y/N] ").strip().lower() in {"y", "yes"}
+    try:
+        answer = input(f"允许执行 bash 命令 `{operation}` 吗？[y/N] ")
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    return answer.strip().lower() in {"y", "yes"}
 
 
-def main() -> None:
-    first = "我先读取项目 README。read 是只读操作，不需要审批。"
+class ReplProvider:
+    """保留多轮 Bash，并让本版新增的五个工具共享同一 Registry。"""
 
-    def finish(request: ModelRequest, _token: CancellationToken):
-        result = request.messages[-1]
-        assert isinstance(result, ToolResultMessage)
-        text = f"\n工具返回：{result.content}"
-        return [ProviderTextDelta(text), ProviderCompleted(AssistantMessage(text))]
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
 
-    fake = FakeModel(
-        [
-            [
-                ProviderTextDelta(first),
-                ProviderCompleted(
-                    AssistantMessage(
-                        first,
-                        (ToolCall("call-1", "read", {"path": "README.md"}),),
-                    )
-                ),
-            ],
-            finish,
+    def stream(self, request: ModelRequest, token: CancellationToken):
+        self.requests.append(request)
+        token.checkpoint()
+        user_indexes = [
+            index
+            for index, message in enumerate(request.messages)
+            if isinstance(message, UserMessage)
         ]
-    )
-    registry = ToolRegistry(create_coding_tools(Path.cwd(), ask))
-    for event in Agent(fake, registry).stream("读一下项目 README"):
+        latest_user_index = user_indexes[-1]
+        prompt = request.messages[latest_user_index].content
+        current_turn = request.messages[latest_user_index:]
+        if isinstance(current_turn[-1], ToolResultMessage):
+            result = current_turn[-1]
+            text = f"第 {len(user_indexes)} 轮完成，{result.tool_name} 返回：\n{result.content}"
+            reply = AssistantMessage(text)
+        elif prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+            command = prompt.removeprefix("/bash ").strip()
+            text = f"第 {len(user_indexes)} 轮请求 Bash。"
+            reply = AssistantMessage(
+                text,
+                (ToolCall(f"bash-{len(user_indexes)}", "bash", {"command": command}),),
+            )
+        elif prompt.strip() == "/bash":
+            text = "用法：/bash <command>"
+            reply = AssistantMessage(text)
+        else:
+            text = f"离线模型收到第 {len(user_indexes)} 轮：{prompt}"
+            reply = AssistantMessage(text)
+        yield ProviderTextDelta(text)
+        yield ProviderCompleted(reply)
+
+
+def print_turn(agent: Agent, prompt: str) -> None:
+    for event in agent.stream(prompt):
         if isinstance(event, TextDelta):
             print(event.delta, end="", flush=True)
         elif isinstance(event, ToolStarted):
             print(f"\n[tool:start] {event.call.name}")
         elif isinstance(event, ToolCompleted):
-            print(f"[tool:done] error={event.result.is_error}")
+            print(f"[tool:done] error={event.result.is_error}: {event.result.content}")
         elif isinstance(event, AgentFailed):
             print(f"\n[{event.kind}] {event.message}")
+    print()
+
+
+def repl(agent: Agent) -> None:
+    print("Pi Agent from Zero v0.5 · Coding Tools")
+    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        print_turn(agent, prompt)
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="运行 v0.5.0 Coding Tools Agent")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
+    args = parser.parse_args()
+    agent = Agent(ReplProvider(), ToolRegistry(create_coding_tools(Path.cwd(), ask)))
+    if args.prompt is not None:
+        print_turn(agent, args.prompt)
+        return
+    repl(agent)
 
 
 if __name__ == "__main__":

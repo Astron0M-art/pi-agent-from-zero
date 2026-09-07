@@ -23,7 +23,7 @@ from events import (
     ToolStarted,
 )
 from messages import AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage
-from providers import FakeModel, ModelRequest, Provider
+from providers import ModelRequest, Provider
 
 Approval = Callable[[str], bool]
 
@@ -120,38 +120,93 @@ class Agent:
 
 
 def ask(command: str) -> bool:
-    return input(f"允许执行 `{command}` 吗？[y/N] ").strip().lower() in {"y", "yes"}
+    try:
+        answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return False
+    return answer.strip().lower() in {"y", "yes"}
 
 
-def main() -> None:
-    first = "我先查看当前目录。"
+class ReplProvider:
+    """v0.2 Provider 边界的流式实现；每次请求都可由历史决定响应。"""
 
-    def finish(request: ModelRequest, _token: CancellationToken):
-        result = request.messages[-1]
-        assert isinstance(result, ToolResultMessage)
-        text = f"\n工具返回：{result.content}"
-        return [ProviderTextDelta(text), ProviderCompleted(AssistantMessage(text))]
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
 
-    fake = FakeModel(
-        [
-            [
-                ProviderTextDelta(first),
-                ProviderCompleted(
-                    AssistantMessage(first, (ToolCall("call-1", "bash", {"command": "pwd"}),))
-                ),
-            ],
-            finish,
+    def stream(self, request: ModelRequest, cancellation: CancellationToken):
+        self.requests.append(request)
+        cancellation.checkpoint()
+        user_indexes = [
+            index
+            for index, message in enumerate(request.messages)
+            if isinstance(message, UserMessage)
         ]
-    )
-    for event in Agent(fake, ask).stream("告诉我当前目录"):
+        latest_user_index = user_indexes[-1]
+        prompt = request.messages[latest_user_index].content
+        current_turn = request.messages[latest_user_index:]
+        if isinstance(current_turn[-1], ToolResultMessage):
+            text = f"第 {len(user_indexes)} 轮完成，bash 返回：\n{current_turn[-1].content}"
+            reply = AssistantMessage(text)
+        elif prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+            command = prompt.removeprefix("/bash ").strip()
+            text = f"第 {len(user_indexes)} 轮请求 Bash。"
+            reply = AssistantMessage(
+                text,
+                (ToolCall(f"bash-{len(user_indexes)}", "bash", {"command": command}),),
+            )
+        elif prompt.strip() == "/bash":
+            text = "用法：/bash <command>"
+            reply = AssistantMessage(text)
+        else:
+            text = f"离线模型收到第 {len(user_indexes)} 轮：{prompt}"
+            reply = AssistantMessage(text)
+        yield ProviderTextDelta(text)
+        yield ProviderCompleted(reply)
+
+
+def print_turn(agent: Agent, prompt: str) -> None:
+    for event in agent.stream(prompt):
         if isinstance(event, TextDelta):
             print(event.delta, end="", flush=True)
         elif isinstance(event, ToolStarted):
             print(f"\n[tool:start] {event.call.name}")
         elif isinstance(event, ToolCompleted):
-            print(f"[tool:done] error={event.result.is_error}")
+            print(f"[tool:done] error={event.result.is_error}: {event.result.content}")
         elif isinstance(event, AgentFailed):
             print(f"\n[{event.kind}] {event.message}")
+    print()
+
+
+def repl(agent: Agent) -> None:
+    print("Pi Agent from Zero v0.3 · Streaming + Cancellation")
+    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        print_turn(agent, prompt)
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="运行 v0.3.0 流式 Agent")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
+    args = parser.parse_args()
+    agent = Agent(ReplProvider(), ask)
+    if args.prompt is not None:
+        print_turn(agent, args.prompt)
+        return
+    repl(agent)
 
 
 if __name__ == "__main__":

@@ -147,7 +147,7 @@ def _console_script() -> Path:
 
 def test_module_cli_reports_success_when_demo_readme_exists() -> None:
     result = subprocess.run(
-        [_console_script()],
+        [_console_script(), "--demo"],
         cwd=Path(__file__).parents[1],
         check=False,
         capture_output=True,
@@ -159,9 +159,40 @@ def test_module_cli_reports_success_when_demo_readme_exists() -> None:
     assert "STATUS> completed" in result.stdout
 
 
-def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) -> None:
+def test_default_cli_keeps_context_across_chat_bash_and_chat(tmp_path: Path) -> None:
     result = subprocess.run(
         [_console_script()],
+        cwd=tmp_path,
+        input="你好\n/bash pwd\ny\n继续聊\n/exit\n",
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    assert "离线模型收到第 1 轮" in result.stdout
+    assert "第 2 轮完成，bash 返回" in result.stdout
+    assert str(tmp_path) in result.stdout
+    assert "离线模型收到第 3 轮" in result.stdout
+    assert "再见" in result.stdout
+
+
+def test_repl_exits_cleanly_on_keyboard_interrupt(monkeypatch, capsys) -> None:
+    agent = Agent(FakeModel([]), ToolRegistry([]))
+    app = TuiApp(agent)
+
+    def interrupt(_prompt: str) -> str:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("builtins.input", interrupt)
+    tui_module.repl(app)
+
+    assert "再见" in capsys.readouterr().out
+
+
+def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [_console_script(), "--demo"],
         cwd=tmp_path,
         check=False,
         capture_output=True,
@@ -180,7 +211,7 @@ def test_module_cli_reports_failure_when_required_grep_has_no_matches(
     (tmp_path / "README.md").write_text("unrelated project\n", encoding="utf-8")
 
     result = subprocess.run(
-        [_console_script()],
+        [_console_script(), "--demo"],
         cwd=tmp_path,
         check=False,
         capture_output=True,
