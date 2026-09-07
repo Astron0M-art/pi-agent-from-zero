@@ -286,6 +286,20 @@ def _finish(
     yield ProviderCompleted(AssistantMessage(text))
 
 
+def _mark_required_demo_tool_failure(app: TuiApp) -> bool:
+    """Turn this scripted demo's required-tool failure into a terminal failure."""
+
+    failed_cards = tuple(card for card in app.state.tool_cards if card.status == "failed")
+    if not failed_cards:
+        return False
+    failed = failed_cards[-1]
+    app.state = reduce_event(
+        app.state,
+        AgentFailed("demo", f"required {failed.name} tool failed"),
+    )
+    return True
+
+
 def main() -> None:
     import argparse
 
@@ -315,7 +329,10 @@ def main() -> None:
     app = TuiApp(agent)
     app.type_text(args.prompt)
     frames = list(app.frames())
-    print(frames[-1])
+    demo_failed = _mark_required_demo_tool_failure(app)
+    print(app.renderer.render(app.state) if demo_failed else frames[-1])
+    if demo_failed:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
