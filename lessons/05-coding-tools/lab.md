@@ -11,7 +11,7 @@ python lessons/05-coding-tools/snapshot/agent.py
 python -m unittest discover -s lessons/05-coding-tools/tests -v
 ```
 
-观察第一次请求包含五个定义，第二次请求末尾是带相同调用 ID 的 `ToolResultMessage`。
+依次输入 `/write note.txt alpha`、`y`、`/read note.txt`、`/edit note.txt alpha beta`、`y`、`/grep beta note.txt`。确认同一会话组合四个工具、写入与编辑各自审批，并且每个第二次模型请求末尾都是带相同调用 ID 的 `ToolResultMessage`。实验后删除临时文件。
 
 ## 实验 2：边界任务——路径逃逸
 

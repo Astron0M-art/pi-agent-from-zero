@@ -7,7 +7,7 @@ python lessons/06-tui-basics/snapshot/tui.py
 python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
-确认最终帧同时包含用户消息、两段助手消息、成功 grep 卡片、空输入光标和 completed 状态。
+输入 `/grep "Pi Agent" README.md`，确认最终帧同时包含用户消息、两段助手消息、成功 grep 卡片、空输入光标和 completed 状态。再输入普通文字，确认新的用户与助手消息追加到同一时间线；最后输入 `/exit`。
 
 ## 实验 2：边界任务——窄而短的视口
 

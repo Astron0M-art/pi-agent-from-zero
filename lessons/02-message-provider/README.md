@@ -2,7 +2,7 @@
 
 v0.1.0 已经跑通最小循环，但 history 是随手拼出的字符串字典，`ModelOutput.bash_command` 把模型、消息和 Bash 耦合在一起。只要接入第二家模型服务、需要关联工具调用，或字段拼错，问题就会扩散到 Agent 循环。
 
-这一版引入两个最小边界：统一 `Message` 联合类型负责“模型看见什么”，`Provider.complete(ModelRequest)` 负责“如何调用某个模型服务”。`FakeModel` 实现同一接口，所以测试与真实适配器将共享调用边界。
+这一版不重做 v0.1 的交互，而是在同一个多轮、Bash、审批闭环中引入两个最小边界：统一 `Message` 联合类型负责“模型看见什么”，`Provider.complete(ModelRequest)` 负责“如何调用某个模型服务”。`FakeModel` 实现同一接口，所以测试与真实适配器将共享调用边界。
 
 ## 学习目标
 
@@ -21,10 +21,10 @@ v0.1.0 已经跑通最小循环，但 history 是随手拼出的字符串字典�
 在仓库根目录执行：
 
 ```bash
-python lessons/02-message-provider/snapshot/agent.py "告诉我当前目录"
+python lessons/02-message-provider/snapshot/agent.py
 ```
 
-批准 `pwd` 后，FakeModel 会通过第二个 `ModelRequest` 读到类型化 `ToolResultMessage` 并给出最终答案。无需 API Key。
+输入 `/bash pwd` 并批准后，离线 Provider 会通过第二个 `ModelRequest` 读到类型化 `ToolResultMessage` 并给出最终答案；随后仍可继续输入普通文字。无需 API Key。
 
 独立测试冻结快照：
 

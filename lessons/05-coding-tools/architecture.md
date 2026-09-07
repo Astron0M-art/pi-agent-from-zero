@@ -1,5 +1,9 @@
 # 架构说明：从通用 Registry 到项目内 Coding Tools
 
+## 从 v0.4 继承什么
+
+同一个多轮 Agent、Provider 事件、Registry、Schema、预算和 Bash 审批继续工作。本版只向同一 Registry 增加四个文件工具和统一截断；CLI 的 `/read`、`/grep`、`/write`、`/edit`、`/bash` 都进入这条管线。
+
 ## 数据流
 
 ```text

@@ -1,6 +1,6 @@
 # v0.1.0：约 100 行最小 Agent
 
-这一版只保留 Coding Agent 最小闭环：用户给任务，单个模型决定是回答还是请求 `bash`，副作用经过用户审批，工具结果回到模型，直到模型给出最终文本。
+这一版建立后续所有版本都必须保留的终端基线：无参数启动后可以连续输入，单个模型决定是回答还是请求 `bash`，副作用经过用户审批，工具结果回到模型，直到模型给出最终文本。约 100 行指核心 Agent、模型协议和工具循环；可用性所需的 REPL 与退出处理另计。
 
 ## 学习目标
 
@@ -22,10 +22,10 @@
 在仓库根目录执行：
 
 ```bash
-python lessons/01-minimal-agent/snapshot/agent.py "告诉我当前目录"
+python lessons/01-minimal-agent/snapshot/agent.py
 ```
 
-程序会展示准备执行的 `pwd`。输入 `y` 后，预期看到当前目录；输入 `n` 后，模型会看到 `DENIED`，磁盘不会产生副作用。
+先输入普通文字观察第 1 轮，再输入 `/bash pwd`。输入 `y` 后会看到当前目录；输入 `n` 后，模型会看到 `DENIED`，磁盘不会产生副作用且仍可继续对话。使用 `/exit` 或 `/quit` 退出。位置参数仍可用于一次性运行，例如 `python lessons/01-minimal-agent/snapshot/agent.py "你好"`。
 
 独立运行冻结快照的测试：
 
@@ -36,7 +36,7 @@ python -m unittest discover -s lessons/01-minimal-agent/tests -v
 安装项目后也可运行当前版本：
 
 ```bash
-pi-agent-zero "告诉我当前目录"
+pi-agent-zero
 ```
 
 ## 阅读顺序

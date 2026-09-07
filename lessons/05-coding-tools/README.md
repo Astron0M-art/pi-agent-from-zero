@@ -2,7 +2,7 @@
 
 上一版已经让模型看见工具 Schema，也能在 Registry 中安全执行工具，但它实际上只会运行 Bash。一个 Coding Agent 若每次读文件、改文件、搜索代码都拼 Shell 命令，很难获得稳定参数、可解释错误和一致的边界。
 
-本版把工具层扩展为 `read`、`write`、`edit`、`bash`、`grep` 五个工具，并在所有成功结果进入模型上下文前执行统一截断。
+本版保留已有多轮终端、流式事件、Registry 和 Bash 审批，把同一工具层扩展为 `read`、`write`、`edit`、`bash`、`grep` 五个工具，并在所有成功结果进入模型上下文前执行统一截断。
 
 ## 学习目标
 
@@ -25,7 +25,7 @@ python lessons/05-coding-tools/snapshot/agent.py
 python -m unittest discover -s lessons/05-coding-tools/tests -v
 ```
 
-演示使用离线 `FakeModel` 请求 `read README.md`，不需要 API Key，也不会修改仓库。预期能看到 `tool:start`、`tool:done` 和 README 的开头；测试应显示 5 个用例全部通过。
+进入终端后可输入 `/read README.md` 或 `/grep "Pi Agent" README.md` 验证只读路径；输入 `/bash pwd`、`/write note.txt hello` 或 `/edit note.txt hello world` 会先请求审批。斜杠命令被确定性离线 Provider 转为结构化 ToolCall，不需要 API Key。输入 `/exit` 退出；测试应显示 5 个用例全部通过。
 
 ## 阅读顺序
 
@@ -44,7 +44,7 @@ python -m unittest discover -s lessons/05-coding-tools/tests -v
 ## 本版完成证据
 
 - 当前工程测试覆盖工具顺序、UTF-8 读取、路径与符号链接逃逸、审批拒绝、唯一编辑、字面搜索、匹配预算和统一截断；
-- 冻结快照测试验证一次完整 FakeModel → ToolCall → ToolResult → 最终回答链路；
+- 根目录累计测试验证同一会话组合 write → read → edit → grep，并继续保留 Bash 审批；
 - 外部结果通过临时目录中的真实文件内容验证，不接受模型自报“已经修改”；
 - 讲义命令可离线执行。
 
