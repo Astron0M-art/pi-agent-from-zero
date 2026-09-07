@@ -87,6 +87,32 @@ def test_write_requires_approval_before_creating_file(tmp_path: Path) -> None:
     assert (tmp_path / "notes/result.txt").read_text(encoding="utf-8") == "done"
 
 
+def test_write_rejects_parent_symlink_swapped_during_approval(tmp_path: Path) -> None:
+    workspace = ProjectWorkspace(tmp_path)
+    original_parent = tmp_path / "notes"
+    original_parent.mkdir()
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+
+    def swap_parent(_operation: str) -> bool:
+        original_parent.rename(tmp_path / "notes-before-approval")
+        original_parent.symlink_to(outside, target_is_directory=True)
+        return True
+
+    try:
+        registry = ToolRegistry([create_write_tool(workspace, swap_parent)])
+        result = call(
+            registry,
+            "write",
+            {"path": "notes/escaped.txt", "content": "must stay inside"},
+        )
+
+        assert result.is_error is True
+        assert not (outside / "escaped.txt").exists()
+    finally:
+        outside.rmdir()
+
+
 def test_edit_requires_one_exact_match_and_never_mutates_on_failure(tmp_path: Path) -> None:
     target = tmp_path / "app.py"
     target.write_text("old\nold\n", encoding="utf-8")
@@ -108,6 +134,42 @@ def test_edit_requires_one_exact_match_and_never_mutates_on_failure(tmp_path: Pa
     )
     assert changed.is_error is False
     assert target.read_text(encoding="utf-8") == "new\n"
+
+
+def test_edit_rejects_file_changed_during_approval(tmp_path: Path) -> None:
+    target = tmp_path / "app.py"
+    target.write_text("old\n", encoding="utf-8")
+
+    def change_file(_operation: str) -> bool:
+        target.write_text("concurrent change\n", encoding="utf-8")
+        return True
+
+    registry = ToolRegistry([create_edit_tool(ProjectWorkspace(tmp_path), change_file)])
+    result = call(
+        registry,
+        "edit",
+        {"path": "app.py", "old_text": "old", "new_text": "new"},
+    )
+
+    assert result.is_error is True
+    assert "changed while awaiting approval" in result.content
+    assert target.read_text(encoding="utf-8") == "concurrent change\n"
+
+
+def test_edit_atomic_replace_preserves_existing_mode(tmp_path: Path) -> None:
+    target = tmp_path / "script.sh"
+    target.write_text("old\n", encoding="utf-8")
+    target.chmod(0o744)
+    registry = ToolRegistry([create_edit_tool(ProjectWorkspace(tmp_path), lambda _operation: True)])
+
+    result = call(
+        registry,
+        "edit",
+        {"path": "script.sh", "old_text": "old", "new_text": "new"},
+    )
+
+    assert result.is_error is False
+    assert target.stat().st_mode & 0o777 == 0o744
 
 
 def test_grep_returns_literal_path_line_matches_and_limit(tmp_path: Path) -> None:

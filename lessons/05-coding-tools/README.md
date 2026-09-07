@@ -25,7 +25,7 @@ python lessons/05-coding-tools/snapshot/agent.py
 python -m unittest discover -s lessons/05-coding-tools/tests -v
 ```
 
-进入终端后可输入 `/read README.md` 或 `/grep "Pi Agent" README.md` 验证只读路径；输入 `/bash pwd`、`/write note.txt hello` 或 `/edit note.txt hello world` 会先请求审批。斜杠命令被确定性离线 Provider 转为结构化 ToolCall，不需要 API Key。输入 `/exit` 退出；测试应显示 5 个用例全部通过。
+进入终端后可输入 `/read README.md` 或 `/grep "Pi Agent" README.md` 验证只读路径；输入 `/bash pwd`、`/write note.txt hello` 或 `/edit note.txt hello world` 会先请求审批。斜杠命令被确定性离线 Provider 转为结构化 ToolCall，不需要 API Key。输入 `/exit` 退出；测试应显示 7 个用例全部通过。
 
 ## 阅读顺序
 
@@ -37,13 +37,13 @@ python -m unittest discover -s lessons/05-coding-tools/tests -v
 
 ## 最小新增抽象
 
-`ProjectWorkspace` 只负责一件事：把模型给出的相对路径解析为项目内路径，并拒绝绝对路径、`..` 逃逸及已存在的符号链接逃逸。五个工具共享它，Registry 则共享 `OutputLimits`。
+`ProjectWorkspace` 负责把模型给出的相对路径限制在项目内。只读工具拒绝绝对路径、`..` 与已存在的符号链接逃逸；写工具在审批后从稳定的项目根目录描述符重新逐级打开父目录，并通过临时文件原子替换目标。`edit` 还会在落盘前重读目标，若审批等待期间内容变化就中止。五个工具共享它，Registry 则共享 `OutputLimits`。
 
 本版故意不加入 allow/ask/deny 规则表、项目 trust 和审计日志；这些属于 v0.8.0。现在的审批仍是宿主注入的布尔函数，`read/grep` 默认只读，`write/edit/bash` 需要审批。
 
 ## 本版完成证据
 
-- 当前工程测试覆盖工具顺序、UTF-8 读取、路径与符号链接逃逸、审批拒绝、唯一编辑、字面搜索、匹配预算和统一截断；
+- 当前工程测试覆盖工具顺序、UTF-8 读取、路径与符号链接逃逸、审批期间父目录替换、并发编辑拒绝、唯一编辑、字面搜索、匹配预算和统一截断；
 - 根目录累计测试验证同一会话组合 write → read → edit → grep，并继续保留 Bash 审批；
 - 外部结果通过临时目录中的真实文件内容验证，不接受模型自报“已经修改”；
 - 讲义命令可离线执行。
@@ -52,7 +52,7 @@ python -m unittest discover -s lessons/05-coding-tools/tests -v
 
 - 图片、二进制文件、行号分页和大文件流式读取；
 - 正则、glob、`.gitignore` 与 ripgrep 的完整行为；
-- 原子写入、并发文件变更队列和 diff 渲染；
+- 跨进程事务、并发文件变更队列和 diff 渲染；
 - 跨平台强隔离沙箱；
 - 细粒度权限、信任与审计。
 

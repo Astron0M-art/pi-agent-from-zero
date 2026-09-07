@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import os
+import secrets
+import stat
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 from typing import cast
 
@@ -39,6 +42,116 @@ class ProjectWorkspace:
 
     def display(self, path: Path) -> str:
         return path.relative_to(self.root).as_posix() or "."
+
+    def atomic_write(
+        self,
+        raw_path: str,
+        content: str,
+        *,
+        expected_content: str | None = None,
+    ) -> None:
+        """Write through a stable directory descriptor and reject stale edits."""
+
+        parts = self._safe_parts(raw_path)
+        parent_fd = self._open_parent(parts[:-1], create=expected_content is None)
+        filename = parts[-1]
+        temporary = f".pi-agent-{secrets.token_hex(8)}.tmp"
+        try:
+            target_mode = self._mode_at(parent_fd, filename)
+            if expected_content is not None:
+                current = self._read_at(parent_fd, filename)
+                if current != expected_content:
+                    raise ToolExecutionError("file changed while awaiting approval; edit aborted")
+            flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+            if hasattr(os, "O_NOFOLLOW"):
+                flags |= os.O_NOFOLLOW
+            temporary_fd = os.open(temporary, flags, 0o600, dir_fd=parent_fd)
+            try:
+                if target_mode is not None:
+                    os.fchmod(temporary_fd, target_mode)
+                with os.fdopen(temporary_fd, "w", encoding="utf-8") as handle:
+                    handle.write(content)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+            except BaseException:
+                with suppress(OSError):
+                    os.unlink(temporary, dir_fd=parent_fd)
+                raise
+            os.replace(
+                temporary,
+                filename,
+                src_dir_fd=parent_fd,
+                dst_dir_fd=parent_fd,
+            )
+        except ToolExecutionError:
+            raise
+        except OSError as error:
+            raise ToolExecutionError(f"could not write file: {error}") from error
+        finally:
+            with suppress(OSError):
+                os.unlink(temporary, dir_fd=parent_fd)
+            os.close(parent_fd)
+
+    def _safe_parts(self, raw_path: str) -> tuple[str, ...]:
+        requested = Path(raw_path)
+        if requested.is_absolute():
+            raise ToolExecutionError("path must be relative to the project root")
+        parts = tuple(part for part in requested.parts if part not in {"", "."})
+        if not parts or ".." in parts:
+            raise ToolExecutionError("path escapes the project root")
+        return parts
+
+    def _open_parent(self, parts: tuple[str, ...], *, create: bool) -> int:
+        if os.open not in os.supports_dir_fd or os.rename not in os.supports_dir_fd:
+            raise ToolExecutionError("secure file writes require dir_fd support")
+        flags = os.O_RDONLY
+        if hasattr(os, "O_DIRECTORY"):
+            flags |= os.O_DIRECTORY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        current_fd = os.open(self.root, flags)
+        try:
+            for part in parts:
+                if create:
+                    with suppress(FileExistsError):
+                        os.mkdir(part, dir_fd=current_fd)
+                next_fd = os.open(part, flags, dir_fd=current_fd)
+                os.close(current_fd)
+                current_fd = next_fd
+            return current_fd
+        except BaseException:
+            os.close(current_fd)
+            raise
+
+    @staticmethod
+    def _read_at(parent_fd: int, filename: str) -> str:
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            descriptor = os.open(filename, flags, dir_fd=parent_fd)
+            with os.fdopen(descriptor, encoding="utf-8") as handle:
+                return handle.read()
+        except UnicodeDecodeError as error:
+            raise ToolExecutionError("edit only supports UTF-8 text files") from error
+        except OSError as error:
+            raise ToolExecutionError(f"could not read file: {error}") from error
+
+    @staticmethod
+    def _mode_at(parent_fd: int, filename: str) -> int | None:
+        flags = os.O_RDONLY
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        try:
+            descriptor = os.open(filename, flags, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return None
+        except OSError as error:
+            raise ToolExecutionError(f"could not inspect file: {error}") from error
+        try:
+            return stat.S_IMODE(os.fstat(descriptor).st_mode)
+        finally:
+            os.close(descriptor)
 
 
 def _definition(
@@ -98,18 +211,15 @@ def create_write_tool(workspace: ProjectWorkspace, approve: Approval) -> Tool:
     )
 
     def execute(arguments: Mapping[str, object], token: CancellationToken) -> ToolOutcome:
-        path = workspace.resolve(cast(str, arguments["path"]))
+        raw_path = cast(str, arguments["path"])
+        path = workspace.resolve(raw_path)
         relative = workspace.display(path)
         token.checkpoint()
         if not approve(f"write {relative}"):
             return ToolOutcome(f"user denied writing {relative}", is_error=True)
         token.checkpoint()
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            content = cast(str, arguments["content"])
-            path.write_text(content, encoding="utf-8")
-        except OSError as error:
-            raise ToolExecutionError(f"could not write file: {error}") from error
+        content = cast(str, arguments["content"])
+        workspace.atomic_write(raw_path, content)
         token.checkpoint()
         return ToolOutcome(f"wrote {len(content)} characters to {relative}")
 
@@ -129,7 +239,8 @@ def create_edit_tool(workspace: ProjectWorkspace, approve: Approval) -> Tool:
     )
 
     def execute(arguments: Mapping[str, object], token: CancellationToken) -> ToolOutcome:
-        path = workspace.resolve(cast(str, arguments["path"]))
+        raw_path = cast(str, arguments["path"])
+        path = workspace.resolve(raw_path)
         relative = workspace.display(path)
         if not path.is_file():
             raise ToolExecutionError(f"file not found: {relative}")
@@ -151,10 +262,11 @@ def create_edit_tool(workspace: ProjectWorkspace, approve: Approval) -> Tool:
             return ToolOutcome(f"user denied editing {relative}", is_error=True)
         token.checkpoint()
         new_text = cast(str, arguments["new_text"])
-        try:
-            path.write_text(content.replace(old_text, new_text, 1), encoding="utf-8")
-        except OSError as error:
-            raise ToolExecutionError(f"could not edit file: {error}") from error
+        workspace.atomic_write(
+            raw_path,
+            content.replace(old_text, new_text, 1),
+            expected_content=content,
+        )
         token.checkpoint()
         return ToolOutcome(f"replaced one block in {relative}")
 
