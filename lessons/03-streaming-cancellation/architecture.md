@@ -33,16 +33,16 @@ Provider 可以产生多个 `ProviderTextDelta`，但必须以一个 `ProviderCo
 
 | 问题 | v0.3.0 的答案 |
 |---|---|
-| 请求入口 | `Agent.stream(prompt, cancellation, timeout_seconds)`；`run()` 是兼容包装器 |
+| 请求入口 | 冻结快照用 `Agent.stream(prompt, cancellation=CancellationToken(timeout))`；当前 `src` 另有 `timeout_seconds` 和 `run()` 兼容包装器 |
 | 权威状态 | `Agent.messages` 保存已提交的模型上下文；事件本身不是持久状态 |
 | 谁决定下一步 | 模型用最终 AssistantMessage 的 ToolCall 表达意图；Agent 验证事件协议、预算与取消后调度 |
-| 副作用位置 | Bash 仍只在 `_execute()`；审批前后和轮询子进程时检查取消 |
+| 副作用位置 | Bash 仍只在 `_execute()`；进入工具前检查 token，`subprocess.run()` 另有固定命令超时，但本快照不能在命令运行中响应取消 |
 | 完成证据 | 恰好一个终止事件、delta/final 一致、取消不提交半消息、外部副作用与离线测试 |
 
 ## 三种停止不是一种失败
 
 - 用户取消：`cancelled`，由外部 token 触发。
-- 运行截止：`timeout`，限制整个 Agent run。
+- 运行截止：`timeout`，在 Provider 事件和 Agent 循环检查点生效；本快照的阻塞 Bash 可能延迟观察到截止时间。
 - 命令超时：一个可回填模型的错误 ToolResult，模型可以改正方案。
 - Provider/协议错误：分别是上游明确失败和事件序列违反合约。
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from events import CancellationToken, Cancelled
+from events import CancellationToken, Cancelled, DeadlineExceeded
 from messages import ToolCall, ToolResultMessage
 
 ToolHandler = Callable[[Mapping[str, object], CancellationToken], "ToolOutcome"]
@@ -120,7 +120,7 @@ class ToolRegistry:
                 truncate_output(outcome.content or "(no output)", self.output_limits),
                 outcome.is_error,
             )
-        except Cancelled:
+        except (Cancelled, DeadlineExceeded):
             raise
         except ToolExecutionError as error:
             return ToolResultMessage(call.id, call.name, str(error), True)

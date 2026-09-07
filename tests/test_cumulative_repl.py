@@ -126,24 +126,67 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
     version: str, entry: Path, uses_registry: bool
 ) -> None:
     constructor = (
-        "Agent(FakeModel([]), ToolRegistry([]))"
+        "Agent(provider, ToolRegistry([]))"
         if uses_registry
-        else "Agent(FakeModel([]), lambda _command: True)"
+        else "Agent(provider, lambda _command: True)"
     )
-    registry_import = "from tools import ToolRegistry\n" if uses_registry else ""
+    registry_import = (
+        "from tools import Tool, ToolDefinition, ToolOutcome, ToolRegistry\n"
+        if uses_registry
+        else ""
+    )
+    tool_timeout_program = ""
+    if uses_registry:
+        tool_timeout_program = (
+            "from messages import ToolCall\n"
+            "def slow_tool(_arguments, token):\n"
+            "    time.sleep(0.01)\n"
+            "    token.checkpoint()\n"
+            "    return ToolOutcome('late')\n"
+            "definition = ToolDefinition('slow', 'slow', "
+            "{'type': 'object', 'properties': {}, 'additionalProperties': False})\n"
+            "tool_reply = AssistantMessage(tool_calls=(ToolCall('slow-1', 'slow', {}),))\n"
+            "tool_agent = Agent(FakeModel([[ProviderCompleted(tool_reply)]]), "
+            "ToolRegistry([Tool(definition, slow_tool)]))\n"
+            "tool_events = list(tool_agent.stream('tool', "
+            "cancellation=CancellationToken(0.001)))\n"
+            "print(tool_events[-1].kind, len(tool_agent.messages))\n"
+        )
     program = (
+        "import time\n"
         "from agent import Agent\n"
-        "from events import CancellationToken\n"
+        "from events import CancellationToken, ProviderCompleted, ProviderTextDelta\n"
+        "from messages import AssistantMessage\n"
         "from providers import FakeModel\n"
         f"{registry_import}"
+        f"def make(provider):\n    return {constructor}\n"
         "cancelled = CancellationToken()\n"
         "cancelled.cancel('test stop')\n"
-        f"first = {constructor}\n"
+        "first = make(FakeModel([]))\n"
         "cancel_events = list(first.stream('cancel', cancellation=cancelled))\n"
-        f"second = {constructor}\n"
+        "second = make(FakeModel([]))\n"
         "timeout_events = list(second.stream('timeout', cancellation=CancellationToken(0)))\n"
         "print(cancel_events[-1].kind, len(first.messages))\n"
         "print(timeout_events[-1].kind, len(second.messages))\n"
+        "def cancel_mid(_request, token):\n"
+        "    yield ProviderTextDelta('half')\n"
+        "    token.cancel('mid-stream stop')\n"
+        "    yield ProviderCompleted(AssistantMessage('half'))\n"
+        "mid = make(FakeModel([cancel_mid]))\n"
+        "mid_events = list(mid.stream('mid', cancellation=CancellationToken()))\n"
+        "print(mid_events[-1].kind, len(mid.messages))\n"
+        "def expire_mid(_request, _token):\n"
+        "    yield ProviderTextDelta('half')\n"
+        "    time.sleep(0.01)\n"
+        "    yield ProviderCompleted(AssistantMessage('half'))\n"
+        "late = make(FakeModel([expire_mid]))\n"
+        "late_events = list(late.stream('late', cancellation=CancellationToken(0.001)))\n"
+        "print(late_events[-1].kind, len(late.messages))\n"
+        "bad = make(FakeModel([[ProviderTextDelta('a'), "
+        "ProviderCompleted(AssistantMessage('b'))]]))\n"
+        "bad_events = list(bad.stream('bad'))\n"
+        "print(bad_events[-1].kind, len(bad.messages))\n"
+        f"{tool_timeout_program}"
     )
     result = subprocess.run(
         [sys.executable, "-c", program],
@@ -155,7 +198,16 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
     )
 
     assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
-    assert result.stdout.splitlines() == ["cancelled 0", "timeout 0"]
+    expected = [
+        "cancelled 0",
+        "timeout 0",
+        "cancelled 1",
+        "timeout 1",
+        "protocol 1",
+    ]
+    if uses_registry:
+        expected.append("timeout 2")
+    assert result.stdout.splitlines() == expected
 
 
 @pytest.mark.parametrize(("version", "entry"), CODING_TOOL_ENTRIES)

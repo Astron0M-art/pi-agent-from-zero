@@ -75,6 +75,8 @@ class Agent:
             yield AgentFailed("cancelled", str(error))
         except DeadlineExceeded as error:
             yield AgentFailed("timeout", str(error))
+        except ProtocolError as error:
+            yield AgentFailed("protocol", str(error))
         except RuntimeError as error:
             yield AgentFailed("provider", str(error))
 
@@ -83,6 +85,7 @@ class Agent:
         deltas: list[str] = []
         completed: AssistantMessage | None = None
         for event in self.provider.stream(request, token):
+            token.checkpoint()
             if isinstance(event, ProviderTextDelta):
                 deltas.append(event.delta)
                 yield TextDelta(event.delta)
@@ -92,11 +95,16 @@ class Agent:
                 if event.kind == "cancelled":
                     raise Cancelled(event.message)
                 raise RuntimeError(event.message)
+        token.checkpoint()
         if completed is None:
-            raise RuntimeError("provider stream ended without completed event")
+            raise ProtocolError("provider stream ended without completed event")
         if deltas and "".join(deltas) != completed.content:
-            raise RuntimeError("streamed text does not match completed message")
+            raise ProtocolError("streamed text does not match completed message")
         return completed
+
+
+class ProtocolError(RuntimeError):
+    pass
 
 
 def ask(operation: str) -> bool:
