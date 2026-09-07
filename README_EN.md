@@ -12,7 +12,9 @@ The project starts with an approximately 100-line Python agent and follows a sta
 
 ## Status
 
-Current code version: `v0.6.1`, a credibility maintenance patch whose teaching behavior remains the [`v0.6.0` foundation for TUI state and text-frame rendering](lessons/06-tui-basics/README.md). It projects Agent events into an input area, chronological message and tool timeline, tool cards, a fixed status bar, and a bounded viewport while keeping display state separate from model context. The demo prints one deterministic text frame; it is **not** a complete interactive TUI with raw mode, a keyboard event loop, or differential rendering.
+Current source version: `v0.6.2`, a cumulative-interaction correction whose teaching topic remains the [`v0.6.0` foundation for TUI state and text-frame rendering](lessons/06-tui-basics/README.md). The default CLI keeps one Agent alive across multiple inputs. Plain text is echoed by a deterministic offline Provider; `/read`, `/grep`, `/write`, `/edit`, and `/bash` enter the real tool runtime, and write, edit, or shell side effects require an explicit `y` or `yes` each time.
+
+The display projects events into a message timeline, tool cards, a status bar, and a bounded viewport. It has a line-oriented input loop, but it is **not** a complete interactive TUI with raw mode, key-by-key editing, IME handling, or differential rendering. It also does not connect to a real language model.
 
 ## Run the latest release
 
@@ -21,18 +23,20 @@ The commands below require `python3.11`; you may substitute another interpreter 
 ```bash
 python3.11 --version
 python3.11 -m venv .venv
-.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
-.venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/pi-agent-zero
 ```
 
-The demo prints one deterministic 18-line text frame. Its nominal width is budgeted in Python characters, not Unicode terminal display columns.
+Try `hello`, `/read README.md`, `/grep "Pi Agent" README.md`, `/bash pwd`, approve with `y`, and then `/exit`. This path combines conversation history, coding tools, approval, event streaming, and text-frame rendering. The offline Provider demonstrates control flow only, not model quality. Read, grep, write, and edit validate paths against the startup working directory; writes revalidate after approval. This is not a sandbox against hostile concurrent filesystem mutation. Bash only starts in that directory, and an approved command can reach outside it. The former one-shot README search remains available as `pi-agent-zero --demo`.
+
+The frame's nominal width is budgeted in Python characters, not Unicode terminal display columns.
 
 The instructional source of truth is the Chinese lesson. Public APIs and code identifiers remain in English.
-Earlier releases remain independently runnable under [`lessons/`](lessons/README.md).
+Every main-branch lesson remains independently runnable and inherits the preceding terminal baseline. Published tags remain immutable and can be used to inspect their original state. See the [capability matrix](docs/capability-matrix.md) for executable evidence.
 
 ## Teaching principles
 
-- Every release is independently runnable.
+- Every release is independently runnable and adds one main concept without removing the preceding terminal behavior.
 - Every capability maps to concrete Pi source files and symbols.
 - Every lesson includes experiments, failure injection, tests, and comprehension checks.
 - Behavior is verified before abstractions and features are added.

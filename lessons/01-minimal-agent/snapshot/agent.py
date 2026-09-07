@@ -1,4 +1,4 @@
-"""v0.1.0 冻结快照：单模型、单 Bash 工具、显式审批、最小循环。"""
+"""v0.1.0 冻结快照：可连续对话的最小 Agent 与显式 Bash 审批。"""
 
 from __future__ import annotations
 
@@ -80,21 +80,69 @@ class Agent:
 
 
 def demo_model(history: Sequence[HistoryEntry]) -> ModelOutput:
-    tool_results = [item for item in history if item["role"] == "tool"]
-    if not tool_results:
-        return ModelOutput("我先确认当前工作目录。", "pwd")
-    return ModelOutput(f"任务演示完成，bash 返回：\n{tool_results[-1]['content']}")
+    """确定性离线模型：普通文字回显，``/bash`` 触发工具调用。"""
+
+    user_indexes = [index for index, item in enumerate(history) if item["role"] == "user"]
+    latest_user_index = user_indexes[-1]
+    current_turn = history[latest_user_index:]
+    prompt = history[latest_user_index]["content"]
+
+    if current_turn[-1]["role"] == "tool":
+        result = current_turn[-1]["content"]
+        return ModelOutput(f"第 {len(user_indexes)} 轮完成，bash 返回：\n{result}")
+    if prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+        command = prompt.removeprefix("/bash ").strip()
+        return ModelOutput(f"第 {len(user_indexes)} 轮请求 Bash。", command)
+    if prompt.strip() == "/bash":
+        return ModelOutput("用法：/bash <command>")
+    return ModelOutput(f"离线模型收到第 {len(user_indexes)} 轮：{prompt}")
 
 
 def ask(command: str) -> bool:
-    answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
+    try:
+        answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
+    except EOFError:
+        print()
+        return False
     return answer.strip().lower() in {"y", "yes"}
 
 
-if __name__ == "__main__":
+def repl(agent: Agent) -> None:
+    """复用同一个 Agent，让 history 跨用户轮次保留。"""
+
+    print("Pi Agent from Zero v0.1 · 离线教学模式")
+    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        try:
+            print(f"Assistant > {agent.run(prompt)}")
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
+
+
+def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行 v0.1.0 最小 Agent 离线演示")
-    parser.add_argument("prompt", nargs="?", default="告诉我当前目录")
+    parser = argparse.ArgumentParser(description="运行 v0.1.0 最小 Agent")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
     args = parser.parse_args()
-    print(Agent(demo_model, ask).run(args.prompt))
+    agent = Agent(demo_model, ask)
+    if args.prompt is not None:
+        print(agent.run(args.prompt))
+        return
+    repl(agent)
+
+
+if __name__ == "__main__":
+    main()

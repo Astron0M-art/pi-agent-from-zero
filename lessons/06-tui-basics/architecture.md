@@ -1,5 +1,9 @@
 # 架构说明：TUI 是事件投影，不是 Agent 大脑
 
+## 从 v0.5 继承什么
+
+多轮 Agent、五个 Coding Tools、项目路径边界、审批和事件流都保留。TUI 只订阅并显示这些事实；行式 REPL 重复调用同一个 `TuiApp`，不会为每个 prompt 重建 Agent 或清空上下文。
+
 ## 数据流
 
 ```text
@@ -38,7 +42,7 @@ TuiRenderer(width, height) --> deterministic frame
 
 ## 4. 副作用在哪里
 
-Reducer 和 Renderer 都是纯内存计算。真实副作用仍只发生在 v0.5 的工具层。CLI 最后 `print()` 一帧是显示副作用，不改变 Agent 任务结果。
+Reducer 和 Renderer 都是纯内存计算。真实副作用仍只发生在 v0.5 的工具层。CLI 在每个 prompt 完成后 `print()` 当前帧是显示副作用，不改变 Agent 任务结果；进入文本帧或额外 `TOOL>` 摘要前，不可信控制字符会被转换成可见的 `\\xNN` 文本。
 
 ## 5. 错误、取消与恢复
 

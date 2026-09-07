@@ -6,7 +6,7 @@
 python lessons/03-streaming-cancellation/snapshot/agent.py
 ```
 
-输入 `y`，观察文本 delta、`tool:start`、`tool:done` 和最终 delta。回答：CLI 为什么不需要等待完整回答才开始显示？
+输入 `/bash pwd` 和 `y`，观察文本 delta、`tool:start`、`tool:done` 和最终 delta；再输入普通文字确认会话仍在。回答：CLI 为什么不需要等待完整回答才开始显示？
 
 ## 实验 2：半流取消
 

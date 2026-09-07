@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import re
+import signal
 import subprocess
 import time
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
@@ -219,6 +222,7 @@ class ToolRegistry:
         return self._definitions
 
     def execute(self, call: ToolCall, cancellation: CancellationToken) -> ToolResultMessage:
+        cancellation.checkpoint()
         tool = self._tools.get(call.name)
         if tool is None:
             return self._error(call, f"tool not found: {call.name}")
@@ -230,6 +234,7 @@ class ToolRegistry:
                 raise TypeError("tool handler must return ToolOutcome")
             if not isinstance(outcome.content, str) or not isinstance(outcome.is_error, bool):
                 raise TypeError("ToolOutcome must contain string content and bool is_error")
+            cancellation.checkpoint()
             return ToolResultMessage(
                 call.id,
                 call.name,
@@ -239,10 +244,13 @@ class ToolRegistry:
         except (CancellationRequested, DeadlineExceeded):
             raise
         except SchemaValidationError as error:
+            cancellation.checkpoint()
             return self._error(call, f"invalid arguments: {error}")
         except ToolExecutionError as error:
+            cancellation.checkpoint()
             return self._error(call, str(error))
         except Exception as error:
+            cancellation.checkpoint()
             return self._error(call, f"tool execution failed: {error}")
 
     @staticmethod
@@ -287,15 +295,27 @@ def create_bash_tool(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                start_new_session=os.name == "posix",
             )
         except OSError as error:
             raise ToolExecutionError(f"could not start command: {error}") from error
 
         started_at = time.monotonic()
         while True:
+            remaining = timeout_seconds - (time.monotonic() - started_at)
+            if remaining <= 0:
+                _stop_process(process)
+                return ToolOutcome(f"command timed out after {timeout_seconds:g}s", is_error=True)
             try:
-                stdout, stderr = process.communicate(timeout=0.05)
+                stdout, stderr = process.communicate(timeout=min(0.05, remaining))
+                if time.monotonic() - started_at >= timeout_seconds:
+                    return ToolOutcome(
+                        f"command timed out after {timeout_seconds:g}s", is_error=True
+                    )
                 break
+            except KeyboardInterrupt:
+                _stop_process(process)
+                raise
             except subprocess.TimeoutExpired:
                 try:
                     cancellation.checkpoint()
@@ -308,6 +328,7 @@ def create_bash_tool(
                         f"command timed out after {timeout_seconds:g}s", is_error=True
                     )
 
+        cancellation.checkpoint()
         output = stdout + stderr
         is_error = process.returncode != 0
         if is_error:
@@ -318,9 +339,33 @@ def create_bash_tool(
 
 
 def _stop_process(process: subprocess.Popen[str]) -> None:
-    process.terminate()
+    _signal_process_tree(process, signal.SIGTERM)
     try:
         process.communicate(timeout=0.2)
     except subprocess.TimeoutExpired:
+        _signal_process_tree(process, signal.SIGKILL)
+        try:
+            process.communicate(timeout=0.2)
+        except subprocess.TimeoutExpired:
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+            try:
+                process.wait(timeout=0.2)
+            except subprocess.TimeoutExpired as error:
+                raise ToolExecutionError("could not stop command process tree") from error
+
+
+def _signal_process_tree(process: subprocess.Popen[str], requested_signal: int) -> None:
+    process_id = getattr(process, "pid", None)
+    if os.name == "posix" and isinstance(process_id, int):
+        with suppress(ProcessLookupError):
+            os.killpg(process_id, requested_signal)
+        return
+    if process.poll() is not None:
+        return
+    if requested_signal == signal.SIGTERM:
+        process.terminate()
+    else:
         process.kill()
-        process.communicate()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Protocol, TypeAlias
 
 from events import CancellationToken, ProviderEvent
 from messages import Message
@@ -15,6 +15,12 @@ from tools import ToolDefinition
 class ModelRequest:
     messages: tuple[Message, ...]
     tools: tuple[ToolDefinition, ...]
+
+
+class Provider(Protocol):
+    def stream(
+        self, request: ModelRequest, token: CancellationToken
+    ) -> Iterable[ProviderEvent]: ...
 
 
 StreamFactory: TypeAlias = Callable[[ModelRequest, CancellationToken], Iterable[ProviderEvent]]

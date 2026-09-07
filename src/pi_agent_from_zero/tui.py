@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import textwrap
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
@@ -25,7 +26,12 @@ from pi_agent_from_zero.events import (
     ToolCompleted,
     ToolStarted,
 )
-from pi_agent_from_zero.messages import AssistantMessage, ToolCall, ToolResultMessage
+from pi_agent_from_zero.messages import (
+    AssistantMessage,
+    ToolCall,
+    ToolResultMessage,
+    UserMessage,
+)
 from pi_agent_from_zero.providers import FakeModel, ModelRequest
 from pi_agent_from_zero.tools import ToolRegistry
 
@@ -209,7 +215,11 @@ class TuiRenderer:
         body = self._body_lines(state, inner)
         available = self.height - 7
         if len(body) > available:
-            body = ["... earlier entries hidden ...", *body[-(available - 1) :]]
+            body = (
+                ["... earlier entries hidden ..."]
+                if available == 1
+                else ["... earlier entries hidden ...", *body[-(available - 1) :]]
+            )
         body.extend([""] * (available - len(body)))
 
         lines = [border, self._row("Pi Agent from Zero · TUI", inner), border]
@@ -245,12 +255,27 @@ class TuiRenderer:
 
     @staticmethod
     def _row(content: str, width: int) -> str:
-        clipped = content[:width]
+        clipped = _safe_inline_text(content)[:width]
         return f"| {clipped.ljust(width)} |"
 
 
+def _safe_inline_text(content: str) -> str:
+    """Make terminal controls visible instead of letting content execute them."""
+
+    return "".join(
+        character
+        if ord(character) >= 32 and not 127 <= ord(character) <= 159
+        else f"\\x{ord(character):02x}"
+        for character in content
+    )
+
+
+def _safe_multiline_text(content: str) -> str:
+    return "\n".join(_safe_inline_text(line) for line in content.splitlines())
+
+
 def _wrap(prefix: str, content: str, width: int) -> list[str]:
-    normalized = " ".join(content.splitlines())
+    normalized = " ".join(_safe_inline_text(line) for line in content.splitlines())
     available = max(1, width - len(prefix))
     chunks = textwrap.wrap(normalized, width=available) or [""]
     continuation = " " * len(prefix)
@@ -260,7 +285,7 @@ def _wrap(prefix: str, content: str, width: int) -> list[str]:
 
 
 class TuiApp:
-    """连接输入区、Agent 事件流和渲染器；本版一次只运行一个 prompt。"""
+    """连接输入区、Agent 事件流和渲染器，并在多轮间保留状态。"""
 
     def __init__(self, agent: Agent, renderer: TuiRenderer | None = None) -> None:
         self.agent = agent
@@ -294,6 +319,120 @@ def _finish(
     yield ProviderCompleted(AssistantMessage(text))
 
 
+class ReplProvider:
+    """默认离线 Provider：普通对话回显，``/bash`` 走真实工具事件。"""
+
+    provider_id = "repl-fake"
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def stream(
+        self, request: ModelRequest, cancellation: CancellationToken
+    ) -> Iterator[ProviderTextDelta | ProviderCompleted]:
+        self.requests.append(request)
+        cancellation.checkpoint()
+        user_indexes = [
+            index
+            for index, message in enumerate(request.messages)
+            if isinstance(message, UserMessage)
+        ]
+        latest_user_index = user_indexes[-1]
+        prompt = request.messages[latest_user_index].content
+        current_turn = request.messages[latest_user_index:]
+        if isinstance(current_turn[-1], ToolResultMessage):
+            result = current_turn[-1]
+            text = f"第 {len(user_indexes)} 轮完成，{result.tool_name} 返回：\n{result.content}"
+            reply = AssistantMessage(text)
+        elif prompt.startswith("/"):
+            text, call = parse_tool_command(prompt, len(user_indexes))
+            reply = AssistantMessage(text, (call,) if call else ())
+        else:
+            text = f"离线模型收到第 {len(user_indexes)} 轮：{prompt}"
+            reply = AssistantMessage(text)
+        yield ProviderTextDelta(text)
+        yield ProviderCompleted(reply)
+
+
+def parse_tool_command(prompt: str, turn: int) -> tuple[str, ToolCall | None]:
+    """把斜杠命令转换为可显示、可审批、可关联的 ToolCall。"""
+
+    if prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+        command = prompt.removeprefix("/bash ").strip()
+        return f"第 {turn} 轮请求 bash。", ToolCall(f"bash-{turn}", "bash", {"command": command})
+    try:
+        parts = shlex.split(prompt)
+    except ValueError as error:
+        return f"命令解析失败：{error}", None
+    if len(parts) == 2 and parts[0] == "/read":
+        return f"第 {turn} 轮请求 read。", ToolCall(f"read-{turn}", "read", {"path": parts[1]})
+    if len(parts) in {2, 3} and parts[0] == "/grep":
+        arguments = {"query": parts[1]}
+        if len(parts) == 3:
+            arguments["path"] = parts[2]
+        return f"第 {turn} 轮请求 grep。", ToolCall(f"grep-{turn}", "grep", arguments)
+    if len(parts) >= 3 and parts[0] == "/write":
+        return f"第 {turn} 轮请求 write。", ToolCall(
+            f"write-{turn}",
+            "write",
+            {"path": parts[1], "content": " ".join(parts[2:])},
+        )
+    if len(parts) == 4 and parts[0] == "/edit":
+        return f"第 {turn} 轮请求 edit。", ToolCall(
+            f"edit-{turn}",
+            "edit",
+            {"path": parts[1], "old_text": parts[2], "new_text": parts[3]},
+        )
+    return (
+        "工具命令：/read <path>；/grep <query> [path]；"
+        "/write <path> <content>；/edit <path> <old> <new>；/bash <command>",
+        None,
+    )
+
+
+def _ask(operation: str) -> bool:
+    try:
+        answer = input(f"允许执行操作 `{_safe_inline_text(operation)}` 吗？[y/N] ")
+    except EOFError:
+        print()
+        return False
+    return answer.strip().lower() in {"y", "yes"}
+
+
+def _run_turn(app: TuiApp, prompt: str) -> None:
+    existing_cards = len(app.state.tool_cards)
+    app.type_text(prompt)
+    frames = list(app.frames())
+    for card in app.state.tool_cards[existing_cards:]:
+        print(f"TOOL> {_safe_multiline_text(card.output)}")
+    if frames:
+        print(frames[-1])
+
+
+def repl(app: TuiApp) -> None:
+    """持续读取终端输入；TUI 是显示层，不截断 Agent 的会话历史。"""
+
+    print("Pi Agent from Zero v0.6.2 · TUI 状态与文本帧")
+    print("连续对话；/read、/grep、/write、/edit、/bash 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        try:
+            _run_turn(app, prompt)
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
+
+
 def _finalize_demo_state(state: TuiState) -> tuple[TuiState, int]:
     """Validate this scripted demo's one required grep result."""
 
@@ -322,36 +461,59 @@ def _finalize_demo_state(state: TuiState) -> tuple[TuiState, int]:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="运行离线 TUI 文本帧演示（非交互式终端）")
-    parser.add_argument("prompt", nargs="?", default="在 README 里搜索 Pi Agent")
-    args = parser.parse_args()
-    opening = "我先搜索 README。"
-    fake = FakeModel(
-        [
-            [
-                ProviderTextDelta(opening),
-                ProviderCompleted(
-                    AssistantMessage(
-                        opening,
-                        (ToolCall("grep-1", "grep", {"query": "Pi Agent", "path": "README.md"}),),
-                    )
-                ),
-            ],
-            _finish,
-        ]
+    parser = argparse.ArgumentParser(description="运行多轮 TUI 文本帧 Agent")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
+    parser.add_argument(
+        "--demo",
+        action="store_true",
+        help="运行 v0.6.1 的一次性 README grep 演示（旧默认行为）",
     )
+    args = parser.parse_args()
+    if args.demo:
+        opening = "我先搜索 README。"
+        fake = FakeModel(
+            [
+                [
+                    ProviderTextDelta(opening),
+                    ProviderCompleted(
+                        AssistantMessage(
+                            opening,
+                            (
+                                ToolCall(
+                                    _REQUIRED_DEMO_CALL_ID,
+                                    "grep",
+                                    {"query": "Pi Agent", "path": "README.md"},
+                                ),
+                            ),
+                        )
+                    ),
+                ],
+                _finish,
+            ]
+        )
+        demo_agent = Agent(
+            fake,
+            ToolRegistry(create_coding_tools(Path.cwd(), lambda _operation: False)),
+            model="fake-scripted",
+        )
+        demo_app = TuiApp(demo_agent)
+        demo_app.type_text(args.prompt or "在 README 里搜索 Pi Agent")
+        list(demo_app.frames())
+        demo_app.state, exit_code = _finalize_demo_state(demo_app.state)
+        print(demo_app.renderer.render(demo_app.state))
+        if exit_code:
+            raise SystemExit(exit_code)
+        return
     agent = Agent(
-        fake,
-        ToolRegistry(create_coding_tools(Path.cwd(), lambda _operation: False)),
-        model="fake-scripted",
+        ReplProvider(),
+        ToolRegistry(create_coding_tools(Path.cwd(), _ask)),
+        model="repl-fake",
     )
     app = TuiApp(agent)
-    app.type_text(args.prompt)
-    list(app.frames())
-    app.state, exit_code = _finalize_demo_state(app.state)
-    print(app.renderer.render(app.state))
-    if exit_code:
-        raise SystemExit(exit_code)
+    if args.prompt is not None:
+        _run_turn(app, args.prompt)
+        return
+    repl(app)
 
 
 if __name__ == "__main__":

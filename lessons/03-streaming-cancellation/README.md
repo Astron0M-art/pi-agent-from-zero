@@ -2,7 +2,7 @@
 
 v0.2.0 的 `Provider.complete()` 只能等待整条消息返回。它隐藏了首字延迟，调用方看不到工具生命周期；Provider 卡住或用户改变主意时，Agent 也没有统一的停止协议。
 
-本版把 Provider 输出改成事件流，并把模型可见消息与运行时事件明确分开。`TextDelta` 可以立即渲染，但 `AssistantMessage` 只有在完成事件到达且文本一致时才进入 history。取消或超时只在检查点生效，因此这是“协作式取消”，不是强制抢占。
+本版保留前两版的多轮终端与审批，再把 Provider 输出改成事件流，并把模型可见消息与运行时事件明确分开。`TextDelta` 可以立即渲染，但 `AssistantMessage` 只有在完成事件到达且文本一致时才进入 history。取消或超时只在检查点生效，因此这是“协作式取消”，不是强制抢占。
 
 ## 学习目标
 
@@ -24,7 +24,7 @@ v0.2.0 的 `Provider.complete()` 只能等待整条消息返回。它隐藏了�
 python lessons/03-streaming-cancellation/snapshot/agent.py
 ```
 
-看到 `pwd` 审批时输入 `y`；输入 `n` 可验证拒绝路径。独立测试：
+输入普通文字可观察增量输出；输入 `/bash pwd` 后会看到工具开始/结束事件和审批，拒绝后会话仍继续。独立测试：
 
 ```bash
 python -m unittest discover -s lessons/03-streaming-cancellation/tests -v
@@ -44,5 +44,5 @@ python -m unittest discover -s lessons/03-streaming-cancellation/tests -v
 - `Provider.complete()` 被 `Provider.stream()` 替代，这是 0.x 教学 API 的刻意演进。
 - 当前工程的 `Agent.run()` 仍保留为一次性结果包装器；冻结快照聚焦 `stream()`。
 - Python 生成器只有被消费时才运行；调用 `stream()` 本身不会启动后台线程。
-- Bash 子进程可被当前工程终止，但孙进程和跨平台进程组隔离尚未解决。
+- 在 POSIX 系统上，当前工程会为 Bash 建立独立进程组，并在取消或超时时终止该组；主动脱离该进程组的后代仍可能逃逸，Windows 回退路径也尚未独立验证。
 - 事件未持久化，不是 Trace；会话恢复与 Trace 分别留到 v0.9.0、v0.14.0。

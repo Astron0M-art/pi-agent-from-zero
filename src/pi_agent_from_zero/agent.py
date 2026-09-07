@@ -98,6 +98,7 @@ class Agent:
                 reply = yield from self._stream_reply(token)
                 self.messages.append(reply)
                 yield AssistantCompleted(reply)
+                token.checkpoint()
                 if not reply.tool_calls:
                     yield AgentCompleted(reply.content)
                     return
@@ -111,7 +112,9 @@ class Agent:
                     result = self.tools.execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
+                    token.checkpoint()
 
+            token.checkpoint()
             raise _BudgetError(f"agent exceeded {self.max_turns} turns")
         except CancellationRequested as error:
             yield AgentFailed("cancelled", str(error))
@@ -155,6 +158,7 @@ class Agent:
         )
         deltas: list[str] = []
         completed: AssistantMessage | None = None
+        provider_failure: ProviderFailed | None = None
         terminal_seen = False
         try:
             for event in self.provider.stream(request, cancellation):
@@ -168,17 +172,21 @@ class Agent:
                     completed = event.message
                     terminal_seen = True
                 elif isinstance(event, ProviderFailed):
+                    provider_failure = event
                     terminal_seen = True
-                    if event.kind == "cancelled":
-                        raise CancellationRequested(event.message)
-                    raise _ProviderError(event.message)
                 else:
                     raise _ProtocolError(f"unknown provider event: {type(event).__name__}")
         except (CancellationRequested, DeadlineExceeded, _ProviderError, _ProtocolError):
             raise
         except Exception as error:
+            cancellation.checkpoint()
             raise _ProviderError(str(error)) from error
 
+        cancellation.checkpoint()
+        if provider_failure is not None:
+            if provider_failure.kind == "cancelled":
+                raise CancellationRequested(provider_failure.message)
+            raise _ProviderError(provider_failure.message)
         if completed is None:
             raise _ProtocolError("provider stream ended without a terminal event")
         streamed_text = "".join(deltas)

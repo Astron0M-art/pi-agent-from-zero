@@ -1,4 +1,4 @@
-"""v0.2.0 冻结快照：统一 Message、Provider 接口和 FakeModel。"""
+"""v0.2.0 冻结快照：保留多轮 REPL，再引入 Message 与 Provider。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from messages import AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage
-from providers import FakeModel, ModelRequest, Provider
+from providers import ModelRequest, Provider
 
 Approval = Callable[[str], bool]
 
@@ -90,22 +90,81 @@ def final_reply(request: ModelRequest) -> AssistantMessage:
     return AssistantMessage(f"任务演示完成，bash 返回：\n{result.content}")
 
 
+class ReplProvider:
+    """根据当前用户轮次生成离线响应，同时记录请求供教学观察。"""
+
+    provider_id = "repl-fake"
+
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
+
+    def complete(self, request: ModelRequest) -> AssistantMessage:
+        self.requests.append(request)
+        user_indexes = [
+            index
+            for index, message in enumerate(request.messages)
+            if isinstance(message, UserMessage)
+        ]
+        latest_user_index = user_indexes[-1]
+        prompt = request.messages[latest_user_index].content
+        current_turn = request.messages[latest_user_index:]
+        if isinstance(current_turn[-1], ToolResultMessage):
+            result = current_turn[-1]
+            return AssistantMessage(f"第 {len(user_indexes)} 轮完成，bash 返回：\n{result.content}")
+        if prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+            command = prompt.removeprefix("/bash ").strip()
+            return AssistantMessage(
+                f"第 {len(user_indexes)} 轮请求 Bash。",
+                (ToolCall(f"bash-{len(user_indexes)}", "bash", {"command": command}),),
+            )
+        if prompt.strip() == "/bash":
+            return AssistantMessage("用法：/bash <command>")
+        return AssistantMessage(f"离线模型收到第 {len(user_indexes)} 轮：{prompt}")
+
+
 def ask(command: str) -> bool:
-    return input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ").strip().lower() in {"y", "yes"}
+    try:
+        answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
+    except EOFError:
+        print()
+        return False
+    return answer.strip().lower() in {"y", "yes"}
+
+
+def repl(agent: Agent) -> None:
+    print("Pi Agent from Zero v0.2 · Message + Provider")
+    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        try:
+            print(f"Assistant > {agent.run(prompt)}")
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="运行 v0.2.0 消息与 Provider Agent")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
+    args = parser.parse_args()
+    agent = Agent(ReplProvider(), ask, model="repl-fake")
+    if args.prompt is not None:
+        print(agent.run(args.prompt))
+        return
+    repl(agent)
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="运行 v0.2.0 消息与 Provider 离线演示")
-    parser.add_argument("prompt", nargs="?", default="告诉我当前目录")
-    args = parser.parse_args()
-    fake = FakeModel(
-        [
-            AssistantMessage(
-                "我先确认当前工作目录。", (ToolCall("call-1", "bash", {"command": "pwd"}),)
-            ),
-            final_reply,
-        ]
-    )
-    print(Agent(fake, ask, model="fake-scripted").run(args.prompt))
+    main()

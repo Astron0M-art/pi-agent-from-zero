@@ -13,21 +13,23 @@ from events import (
     AssistantCompleted,
     CancellationToken,
     Cancelled,
+    DeadlineExceeded,
     ProviderCompleted,
+    ProviderFailed,
     ProviderTextDelta,
     TextDelta,
     ToolCompleted,
     ToolStarted,
 )
 from messages import AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage
-from providers import FakeModel, ModelRequest
+from providers import ModelRequest, Provider
 from tools import ToolRegistry, create_bash_tool
 
 
 class Agent:
     def __init__(
         self,
-        provider: FakeModel,
+        provider: Provider,
         tools: ToolRegistry,
         *,
         max_turns: int = 8,
@@ -39,20 +41,25 @@ class Agent:
         self.max_tool_calls = max_tool_calls
         self.messages: list[Message] = []
 
-    def stream(self, prompt: str) -> Iterator[AgentEvent]:
-        token = CancellationToken()
+    def stream(
+        self, prompt: str, *, cancellation: CancellationToken | None = None
+    ) -> Iterator[AgentEvent]:
+        token = cancellation or CancellationToken()
         yield AgentStarted(prompt)
-        self.messages.append(UserMessage(prompt))
-        tool_calls_used = 0
         try:
+            token.checkpoint()
+            self.messages.append(UserMessage(prompt))
+            tool_calls_used = 0
             for _ in range(self.max_turns):
                 reply = yield from self._reply(token)
                 self.messages.append(reply)
                 yield AssistantCompleted(reply)
+                token.checkpoint()
                 if not reply.tool_calls:
                     yield AgentCompleted(reply.content)
                     return
                 for call in reply.tool_calls:
+                    token.checkpoint()
                     if tool_calls_used >= self.max_tool_calls:
                         yield AgentFailed(
                             "budget", f"agent exceeded {self.max_tool_calls} tool calls"
@@ -63,9 +70,15 @@ class Agent:
                     result = self.tools.execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
+                    token.checkpoint()
+            token.checkpoint()
             yield AgentFailed("budget", f"agent exceeded {self.max_turns} turns")
         except Cancelled as error:
             yield AgentFailed("cancelled", str(error))
+        except DeadlineExceeded as error:
+            yield AgentFailed("timeout", str(error))
+        except ProtocolError as error:
+            yield AgentFailed("protocol", str(error))
         except RuntimeError as error:
             yield AgentFailed("provider", str(error))
 
@@ -73,56 +86,140 @@ class Agent:
         request = ModelRequest(tuple(self.messages), self.tools.definitions)
         deltas: list[str] = []
         completed: AssistantMessage | None = None
-        for event in self.provider.stream(request, token):
+        provider_failure: ProviderFailed | None = None
+        terminal_seen = False
+        for event in self._provider_events(request, token):
+            token.checkpoint()
+            if terminal_seen:
+                raise ProtocolError("provider emitted an event after its terminal event")
             if isinstance(event, ProviderTextDelta):
                 deltas.append(event.delta)
                 yield TextDelta(event.delta)
             elif isinstance(event, ProviderCompleted):
                 completed = event.message
+                terminal_seen = True
+            elif isinstance(event, ProviderFailed):
+                provider_failure = event
+                terminal_seen = True
+            else:
+                raise ProtocolError(f"unknown provider event: {type(event).__name__}")
+        token.checkpoint()
+        if provider_failure is not None:
+            if provider_failure.kind == "cancelled":
+                raise Cancelled(provider_failure.message)
+            raise RuntimeError(provider_failure.message)
         if completed is None:
-            raise RuntimeError("provider stream ended without completed event")
+            raise ProtocolError("provider stream ended without completed event")
         if deltas and "".join(deltas) != completed.content:
-            raise RuntimeError("streamed text does not match completed message")
+            raise ProtocolError("streamed text does not match completed message")
         return completed
+
+    def _provider_events(self, request: ModelRequest, token: CancellationToken):
+        try:
+            yield from self.provider.stream(request, token)
+        except (Cancelled, DeadlineExceeded, ProtocolError):
+            raise
+        except Exception as error:
+            token.checkpoint()
+            raise RuntimeError(str(error)) from error
+
+
+class ProtocolError(RuntimeError):
+    pass
 
 
 def ask(command: str) -> bool:
-    return input(f"允许执行 `{command}` 吗？[y/N] ").strip().lower() in {"y", "yes"}
+    try:
+        answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
+    except EOFError:
+        print()
+        return False
+    return answer.strip().lower() in {"y", "yes"}
 
 
-def main() -> None:
-    first = "我会通过 Registry 调用 bash。"
+class ReplProvider:
+    """在 Registry 版本中保留 v0.3 的多轮流式交互。"""
 
-    def finish(request: ModelRequest, _token: CancellationToken):
-        result = request.messages[-1]
-        assert isinstance(result, ToolResultMessage)
-        text = f"\n工具返回：{result.content}"
-        return [ProviderTextDelta(text), ProviderCompleted(AssistantMessage(text))]
+    def __init__(self) -> None:
+        self.requests: list[ModelRequest] = []
 
-    fake = FakeModel(
-        [
-            [
-                ProviderTextDelta(first),
-                ProviderCompleted(
-                    AssistantMessage(
-                        first,
-                        (ToolCall("call-1", "bash", {"command": "pwd"}),),
-                    )
-                ),
-            ],
-            finish,
+    def stream(self, request: ModelRequest, token: CancellationToken):
+        self.requests.append(request)
+        token.checkpoint()
+        user_indexes = [
+            index
+            for index, message in enumerate(request.messages)
+            if isinstance(message, UserMessage)
         ]
-    )
-    registry = ToolRegistry([create_bash_tool(ask, Path.cwd())])
-    for event in Agent(fake, registry).stream("告诉我当前目录"):
+        latest_user_index = user_indexes[-1]
+        prompt = request.messages[latest_user_index].content
+        current_turn = request.messages[latest_user_index:]
+        if isinstance(current_turn[-1], ToolResultMessage):
+            text = f"第 {len(user_indexes)} 轮完成，bash 返回：\n{current_turn[-1].content}"
+            reply = AssistantMessage(text)
+        elif prompt.startswith("/bash ") and prompt.removeprefix("/bash ").strip():
+            command = prompt.removeprefix("/bash ").strip()
+            text = f"第 {len(user_indexes)} 轮请求 Bash。"
+            reply = AssistantMessage(
+                text,
+                (ToolCall(f"bash-{len(user_indexes)}", "bash", {"command": command}),),
+            )
+        elif prompt.strip() == "/bash":
+            text = "用法：/bash <command>"
+            reply = AssistantMessage(text)
+        else:
+            text = f"离线模型收到第 {len(user_indexes)} 轮：{prompt}"
+            reply = AssistantMessage(text)
+        yield ProviderTextDelta(text)
+        yield ProviderCompleted(reply)
+
+
+def print_turn(agent: Agent, prompt: str) -> None:
+    for event in agent.stream(prompt):
         if isinstance(event, TextDelta):
             print(event.delta, end="", flush=True)
         elif isinstance(event, ToolStarted):
             print(f"\n[tool:start] {event.call.name}")
         elif isinstance(event, ToolCompleted):
-            print(f"[tool:done] error={event.result.is_error}")
+            print(f"[tool:done] error={event.result.is_error}: {event.result.content}")
         elif isinstance(event, AgentFailed):
             print(f"\n[{event.kind}] {event.message}")
+    print()
+
+
+def repl(agent: Agent) -> None:
+    print("Pi Agent from Zero v0.4 · Tool Registry + Budgets")
+    print("普通文字可连续对话；/bash <command> 调用工具；/exit 退出。")
+    while True:
+        try:
+            prompt = input("Pi Agent > ")
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见。")
+            return
+        prompt = prompt.strip()
+        if prompt in {"/exit", "/quit"}:
+            print("再见。")
+            return
+        if not prompt:
+            continue
+        try:
+            print_turn(agent, prompt)
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="运行 v0.4.0 Tool Registry Agent")
+    parser.add_argument("prompt", nargs="?", help="提供后只运行一轮；省略则进入多轮对话")
+    args = parser.parse_args()
+    agent = Agent(ReplProvider(), ToolRegistry([create_bash_tool(ask, Path.cwd())]))
+    if args.prompt is not None:
+        print_turn(agent, args.prompt)
+        return
+    repl(agent)
 
 
 if __name__ == "__main__":

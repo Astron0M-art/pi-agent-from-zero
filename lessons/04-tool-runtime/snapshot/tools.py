@@ -9,7 +9,7 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from events import CancellationToken, Cancelled
+from events import CancellationToken, Cancelled, DeadlineExceeded
 from messages import ToolCall, ToolResultMessage
 
 ToolHandler = Callable[[Mapping[str, object], CancellationToken], "ToolOutcome"]
@@ -74,22 +74,26 @@ class ToolRegistry:
         return tuple(tool.definition for tool in self._tools.values())
 
     def execute(self, call: ToolCall, token: CancellationToken) -> ToolResultMessage:
+        token.checkpoint()
         tool = self._tools.get(call.name)
         if tool is None:
             return ToolResultMessage(call.id, call.name, f"tool not found: {call.name}", True)
         try:
             arguments = validate_arguments(tool.definition.parameters, call.arguments)
         except ValueError as error:
+            token.checkpoint()
             return ToolResultMessage(call.id, call.name, f"invalid arguments: {error}", True)
         try:
             token.checkpoint()
             outcome = tool.execute(arguments, token)
+            token.checkpoint()
             return ToolResultMessage(
                 call.id, call.name, outcome.content or "(no output)", outcome.is_error
             )
-        except Cancelled:
+        except (Cancelled, DeadlineExceeded):
             raise
         except Exception as error:
+            token.checkpoint()
             return ToolResultMessage(call.id, call.name, f"tool execution failed: {error}", True)
 
 

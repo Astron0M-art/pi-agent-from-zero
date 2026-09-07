@@ -2,7 +2,7 @@
 
 v0.3.0 虽然有 ToolCall 和 ToolResult，但 Agent 仍把 `bash` 名称、参数检查、审批、进程执行和错误格式全部写死在 `_execute()` 里。Provider 只看见 `("bash",)`，不知道工具用途和参数 Schema；增加第二个工具只能继续堆条件分支。
 
-本版引入最小 Tool Runtime：`ToolDefinition` 描述模型可见合约，`ToolRegistry` 负责查找、Schema 校验、执行和结果归一化，Agent 只负责编排事件与预算。所有错误结果都保留 `tool_call_id`，模型可以在下一轮修正。
+本版不删除多轮、流式和 Bash 审批，而是把已有 Bash 接入最小 Tool Runtime：`ToolDefinition` 描述模型可见合约，`ToolRegistry` 负责查找、Schema 校验、执行和结果归一化，Agent 只负责编排事件与预算。所有错误结果都保留 `tool_call_id`，模型可以在下一轮修正。
 
 ## 学习目标
 
@@ -24,7 +24,7 @@ v0.3.0 虽然有 ToolCall 和 ToolResult，但 Agent 仍把 `bash` 名称、参�
 python lessons/04-tool-runtime/snapshot/agent.py
 ```
 
-看到 `pwd` 审批时输入 `y`。预期依次看到增量文本、`tool:start`、`tool:done` 和工具结果。输入 `n` 会得到可回填模型的错误 ToolResult。
+输入 `/bash pwd` 并输入 `y`。预期依次看到增量文本、`tool:start`、`tool:done` 和工具结果。输入 `n` 会得到可回填模型的错误 ToolResult，随后仍可继续输入。
 
 独立测试：
 

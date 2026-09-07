@@ -5,10 +5,10 @@
 运行：
 
 ```bash
-python lessons/02-message-provider/snapshot/agent.py "告诉我当前目录"
+python lessons/02-message-provider/snapshot/agent.py
 ```
 
-批准 `pwd`。在代码中打印 `fake.requests`，确认第一次请求末尾是 `UserMessage`，第二次请求末尾是 `ToolResultMessage`，且 `tool_call_id == "call-1"`。
+输入 `/bash pwd` 并批准。在调试器中观察 `agent.provider.requests`，确认第一次请求末尾是 `UserMessage`，第二次请求末尾是 `ToolResultMessage`，且调用 ID 与当前用户轮次关联。继续输入普通文字，确认后续请求仍携带此前 Message。
 
 ## 实验 2：边界任务——未知工具
 

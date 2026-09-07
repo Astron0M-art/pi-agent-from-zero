@@ -1,3 +1,5 @@
+import os
+import time
 from collections.abc import Mapping
 
 import pytest
@@ -5,6 +7,7 @@ import pytest
 from pi_agent_from_zero import (
     CancellationRequested,
     CancellationToken,
+    DeadlineExceeded,
     SchemaDefinitionError,
     SchemaValidationError,
     Tool,
@@ -14,8 +17,10 @@ from pi_agent_from_zero import (
     ToolOutcome,
     ToolRegistry,
     ToolResultMessage,
+    create_bash_tool,
     validate_arguments,
 )
+from pi_agent_from_zero import tools as tools_module
 
 
 def definition(name: str = "echo") -> ToolDefinition:
@@ -149,6 +154,22 @@ def test_unknown_tool_keeps_call_identity() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "call",
+    [
+        ToolCall("missing-1", "missing", {}),
+        ToolCall("invalid-1", "echo", {}),
+    ],
+)
+def test_cancelled_token_wins_over_early_registry_errors(call: ToolCall) -> None:
+    token = CancellationToken()
+    token.cancel("stop before lookup")
+    registry = ToolRegistry([Tool(definition(), lambda _arguments, _token: ToolOutcome("ok"))])
+
+    with pytest.raises(CancellationRequested, match="stop before lookup"):
+        registry.execute(call, token)
+
+
 def test_cancellation_is_not_downgraded_to_tool_error() -> None:
     def cancel(_arguments: Mapping[str, object], token: CancellationToken) -> ToolOutcome:
         token.cancel("stop the run")
@@ -159,3 +180,103 @@ def test_cancellation_is_not_downgraded_to_tool_error() -> None:
 
     with pytest.raises(CancellationRequested, match="stop the run"):
         registry.execute(ToolCall("cancel-1", "echo", {"message": "x"}), CancellationToken())
+
+
+def test_registry_checks_deadline_after_non_cooperative_handler() -> None:
+    def finish_late(_arguments: Mapping[str, object], _token: CancellationToken) -> ToolOutcome:
+        time.sleep(0.01)
+        return ToolOutcome("late success")
+
+    registry = ToolRegistry([Tool(definition(), finish_late)])
+
+    with pytest.raises(DeadlineExceeded, match="exceeded its timeout"):
+        registry.execute(
+            ToolCall("late-1", "echo", {"message": "x"}),
+            CancellationToken(0.001),
+        )
+
+
+def test_registry_deadline_wins_over_late_tool_error() -> None:
+    def fail_late(_arguments: Mapping[str, object], _token: CancellationToken) -> ToolOutcome:
+        time.sleep(0.01)
+        raise ToolExecutionError("late tool error")
+
+    registry = ToolRegistry([Tool(definition(), fail_late)])
+
+    with pytest.raises(DeadlineExceeded, match="exceeded its timeout"):
+        registry.execute(
+            ToolCall("late-1", "echo", {"message": "x"}),
+            CancellationToken(0.001),
+        )
+
+
+def test_bash_interrupt_stops_child_before_propagating(monkeypatch, tmp_path) -> None:
+    class InterruptedProcess:
+        returncode = -15
+
+        def __init__(self) -> None:
+            self.terminated = False
+            self.communicate_calls = 0
+
+        def communicate(self, timeout=None):
+            self.communicate_calls += 1
+            if self.communicate_calls == 1:
+                raise KeyboardInterrupt
+            return "", ""
+
+        def poll(self):
+            return None if not self.terminated else self.returncode
+
+        def terminate(self) -> None:
+            self.terminated = True
+
+        def kill(self) -> None:
+            self.terminated = True
+
+    process = InterruptedProcess()
+    monkeypatch.setattr(tools_module.subprocess, "Popen", lambda *_args, **_kwargs: process)
+    bash = create_bash_tool(lambda _command: True, cwd=tmp_path)
+
+    with pytest.raises(KeyboardInterrupt):
+        bash.execute({"command": "sleep 5"}, CancellationToken())
+
+    assert process.terminated is True
+    assert process.communicate_calls == 2
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process-group semantics are POSIX-specific")
+def test_bash_deadline_stops_background_child_without_waiting_for_it(tmp_path) -> None:
+    child_pid_file = tmp_path / "child.pid"
+    bash = create_bash_tool(lambda _command: True, cwd=tmp_path)
+    started_at = time.monotonic()
+
+    with pytest.raises(DeadlineExceeded, match="exceeded its timeout"):
+        bash.execute(
+            {"command": "sleep 10 & child=$!; echo $child > child.pid; wait"},
+            CancellationToken(0.5),
+        )
+
+    elapsed = time.monotonic() - started_at
+    child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+    child_stopped = False
+    for _ in range(20):
+        try:
+            os.kill(child_pid, 0)
+        except ProcessLookupError:
+            child_stopped = True
+            break
+        time.sleep(0.01)
+
+    assert elapsed < 1
+    assert child_stopped is True
+
+
+def test_bash_command_timeout_shorter_than_poll_slice_is_not_reported_success(
+    tmp_path,
+) -> None:
+    bash = create_bash_tool(lambda _command: True, cwd=tmp_path, timeout_seconds=0.001)
+
+    outcome = bash.execute({"command": "sleep 0.01"}, CancellationToken())
+
+    assert outcome.is_error is True
+    assert outcome.content == "command timed out after 0.001s"

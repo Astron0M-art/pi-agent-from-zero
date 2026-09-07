@@ -1,4 +1,5 @@
-from collections.abc import Iterator
+import time
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import pytest
@@ -173,6 +174,11 @@ def test_zero_timeout_stops_before_mutating_history_or_calling_provider() -> Non
         ([ProviderFailed("上游坏了")], "provider"),
         ([ProviderTextDelta("甲"), ProviderCompleted(AssistantMessage("乙"))], "protocol"),
         ([ProviderTextDelta("没有终点")], "protocol"),
+        (
+            [ProviderFailed("first"), ProviderCompleted(AssistantMessage("too late"))],
+            "protocol",
+        ),
+        ([object(), ProviderCompleted(AssistantMessage("ignored?"))], "protocol"),
     ],
 )
 def test_provider_failures_have_explicit_terminal_event(stream: list, kind: str) -> None:
@@ -183,6 +189,74 @@ def test_provider_failures_have_explicit_terminal_event(stream: list, kind: str)
     assert isinstance(events[-1], AgentFailed)
     assert events[-1].kind == kind
     assert agent.messages == [UserMessage("开始")]
+
+
+class DirectProvider:
+    provider_id = "direct-test"
+
+    def __init__(self, events: Iterable) -> None:
+        self.events = events
+
+    def stream(self, _request: ModelRequest, _token: CancellationToken) -> Iterable:
+        return self.events
+
+
+def test_provider_cannot_emit_after_terminal_event() -> None:
+    provider = DirectProvider(
+        [ProviderCompleted(AssistantMessage("done")), ProviderTextDelta("too late")]
+    )
+    agent = Agent(provider, ToolRegistry([]))
+
+    events = list(agent.stream("开始"))
+
+    assert events[-1] == AgentFailed(
+        "protocol", "provider emitted an event after its terminal event"
+    )
+    assert agent.messages == [UserMessage("开始")]
+
+
+def test_deadline_is_checked_after_provider_generator_finishes() -> None:
+    def slow_after_terminal() -> Iterator[ProviderCompleted]:
+        yield ProviderCompleted(AssistantMessage("late"))
+        time.sleep(0.01)
+
+    agent = Agent(DirectProvider(slow_after_terminal()), ToolRegistry([]))
+
+    events = list(agent.stream("开始", timeout_seconds=0.001))
+
+    assert isinstance(events[-1], AgentFailed)
+    assert events[-1].kind == "timeout"
+    assert agent.messages == [UserMessage("开始")]
+
+
+def test_deadline_is_checked_after_assistant_completed_is_consumed() -> None:
+    message = AssistantMessage("done")
+    agent = Agent(FakeModel([completed(message)]), ToolRegistry([]))
+    events = agent.stream("开始", timeout_seconds=0.01)
+
+    observed = []
+    for event in events:
+        observed.append(event)
+        if event == AssistantCompleted(message):
+            time.sleep(0.02)
+            break
+    observed.extend(events)
+
+    assert observed[-1].kind == "timeout"
+    assert AgentCompleted("done") not in observed
+
+
+def test_deadline_wins_when_provider_raises_late() -> None:
+    class LateFailureProvider:
+        def stream(self, _request: ModelRequest, _token: CancellationToken) -> Iterable:
+            time.sleep(0.02)
+            raise RuntimeError("late provider failure")
+
+    agent = Agent(LateFailureProvider(), ToolRegistry([]))
+
+    events = list(agent.stream("开始", timeout_seconds=0.001))
+
+    assert events[-1].kind == "timeout"
 
 
 def test_command_timeout_is_a_tool_result_and_agent_can_continue(tmp_path: Path) -> None:
@@ -203,6 +277,19 @@ def test_command_timeout_is_a_tool_result_and_agent_can_continue(tmp_path: Path)
     assert result.is_error is True
     assert "timed out" in result.content
     assert answer == "已处理超时"
+
+
+def test_run_deadline_after_short_bash_does_not_emit_tool_success(tmp_path: Path) -> None:
+    call = bash_call("sleep 0.02")
+    fake = FakeModel([completed(AssistantMessage(tool_calls=(call,)))])
+    agent = Agent(fake, bash_registry(cwd=tmp_path))
+
+    events = list(agent.stream("运行", timeout_seconds=0.001))
+
+    assert events[-1].kind == "timeout"
+    assert ToolStarted(call) in events
+    assert not any(isinstance(event, ToolCompleted) for event in events)
+    assert len(agent.messages) == 2
 
 
 def test_model_turn_budget_exposes_failure_kind(tmp_path: Path) -> None:
@@ -234,3 +321,44 @@ def test_tool_call_budget_stops_before_extra_side_effect(tmp_path: Path) -> None
     assert not (tmp_path / "forbidden").exists()
     assert events[-1] == AgentFailed("budget", "agent exceeded 1 tool calls")
     assert ToolStarted(calls[1]) not in events
+
+
+def test_cancellation_after_tool_completed_prevents_next_provider_call(tmp_path: Path) -> None:
+    fake = FakeModel(
+        [
+            completed(AssistantMessage(tool_calls=(bash_call("true"),))),
+            completed(AssistantMessage("must not be requested")),
+        ]
+    )
+    cancellation = CancellationToken()
+    events = Agent(fake, bash_registry(cwd=tmp_path)).stream("运行", cancellation=cancellation)
+    observed = []
+    for event in events:
+        observed.append(event)
+        if isinstance(event, ToolCompleted):
+            cancellation.cancel("stop after tool")
+            break
+    observed.extend(events)
+
+    assert observed[-1] == AgentFailed("cancelled", "stop after tool")
+    assert len(fake.requests) == 1
+
+
+def test_deadline_after_tool_completed_prevents_next_provider_call(tmp_path: Path) -> None:
+    fake = FakeModel(
+        [
+            completed(AssistantMessage(tool_calls=(bash_call("true"),))),
+            completed(AssistantMessage("must not be requested")),
+        ]
+    )
+    events = Agent(fake, bash_registry(cwd=tmp_path)).stream("运行", timeout_seconds=0.01)
+    observed = []
+    for event in events:
+        observed.append(event)
+        if isinstance(event, ToolCompleted):
+            time.sleep(0.02)
+            break
+    observed.extend(events)
+
+    assert observed[-1].kind == "timeout"
+    assert len(fake.requests) == 1

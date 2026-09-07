@@ -4,9 +4,34 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-09-07
+
+### Added
+
+- 新增跨版本累计终端合同，对 v0.1–v0.6 同时验证无参数启动、多轮内存上下文、Bash、`y` / `yes` 审批、拒绝后继续和干净退出。
+- 新增能力矩阵，并从 v0.5 起用同一会话组合验证 write → read → edit → grep，证明后续版本不是平行 Demo。
+
+### Changed
+
+- 六个 lesson 阶段入口改为在同一个 Agent 实例上持续读取输入；v0.2 以后仍逐版增加 Provider、事件流、Registry、Coding Tools 和 TUI 状态，不再用一次性脚本替换基础交互。
+- 默认 `pi-agent-zero` 进入行式多轮 TUI；原 v0.6.1 的一次性 README grep 演示迁移到 `pi-agent-zero --demo`。
+- README、Roadmap、教学合同、六章运行说明和实验统一声明累计演进规则与真实能力边界。
+
 ### Fixed
 
+- 修复 v0.6 文本帧输出一次便退出、导致用户后续输入落回 shell 的回归。
+- 修复 v0.4–v0.6 lesson 在引入 Registry 时丢失 v0.3 可注入取消 token、deadline 和 Provider 失败事件的累计回归。
+- 修复 v0.5 以后 Coding Tools 已注册但无法从默认终端路径触发的问题；read、grep、write、edit 和 bash 现在共享同一工具运行时，写、改、执行仍逐次审批。
 - 安装后的离线 CLI 演示在工作目录缺少必需的 `README.md` 或未匹配到项目标题时，现在保留搜索证据、显示终止失败状态并返回非零退出码，不再把未满足的必需搜索报告为任务完成。
+- `write` 在审批后通过稳定目录描述符重新验证项目边界并原子替换文件；`edit` 还会拒绝覆盖审批等待期间出现的并发变更。
+- v0.3 的 Bash 超时现在回填失败的 `ToolResultMessage`；当前运行时在 Bash 返回后再次检查整轮 deadline，不再先发出工具成功事件。
+- 文本帧和额外的 `TOOL>` 摘要会把模型或工具输出中的终端控制字符显示为转义文本，避免内容触发 ANSI/OSC 控制序列。
+- 当前 Bash 运行时在 POSIX 上为命令建立独立进程组；整轮取消、deadline、命令超时或 Ctrl+C 会有界地终止该组，不再等待仍持有输出管道的后台子进程。
+- 修复 `TuiRenderer(height=8)` 在内容溢出时因 `[-0:]` 保留全部正文、破坏固定高度的问题。
+- 当前 Registry 与 v0.4–v0.6 冻结 Registry 在处理器返回或抛出普通工具异常后重新检查取消和 deadline；v0.3 也在 Bash 返回或命令超时后检查，避免过期运行先提交任何工具结果。
+- v0.3 以后的 Agent 在最终成功、Provider 异常和 Registry 早期错误边界统一重查停止 token；冻结 Provider 的任意普通异常也会归一为单一 `AgentFailed`，不再逸出事件协议。
+- Agent 在 `ToolCompleted` 被消费后、下一次 Provider 请求前再次检查停止 token；文本安全转义同时覆盖 C0、DEL 和 C1 控制字符。
+- 当前 Bash 工具按剩余命令预算缩短轮询窗口，并在进程返回时复核耗时，避免极短 timeout 被固定轮询粒度吞掉。
 
 ## [0.6.1] - 2026-09-05
 
@@ -116,7 +141,8 @@
 
 - 明确项目作者和主要维护者为 Astron_ma（GitHub：`Astron0M-art`）。
 
-[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/Astron0M-art/pi-agent-from-zero/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.6.0
 [0.5.0]: https://github.com/Astron0M-art/pi-agent-from-zero/releases/tag/v0.5.0

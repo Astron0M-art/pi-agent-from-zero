@@ -1,5 +1,9 @@
 # 架构说明：从通用 Registry 到项目内 Coding Tools
 
+## 从 v0.4 继承什么
+
+同一个多轮 Agent、Provider 事件、Registry、Schema、预算和 Bash 审批继续工作。本版只向同一 Registry 增加四个文件工具和统一截断；CLI 的 `/read`、`/grep`、`/write`、`/edit`、`/bash` 都进入这条管线。
+
 ## 数据流
 
 ```text
@@ -38,8 +42,8 @@ messages ← ToolResult ← ToolRegistry ← ToolCall
 ## 4. 副作用在哪里
 
 - `read` 和 `grep` 读取磁盘，不修改项目；
-- `write` 创建目录并创建或覆盖文件；
-- `edit` 在唯一精确匹配后覆盖文件；
+- `write` 创建目录，并通过同目录临时文件原子创建或覆盖文件；
+- `edit` 在唯一精确匹配、审批后内容复验通过时原子覆盖文件；
 - `bash` 可以产生任意命令允许的副作用。
 
 教学版要求 `write/edit/bash` 经宿主审批。路径边界只约束 Python 文件工具；Bash 仍是高能力工具，完整规则将在权限版本实现。
@@ -48,7 +52,7 @@ messages ← ToolResult ← ToolRegistry ← ToolCall
 
 Schema 错误在处理器执行前转为 `ToolResultMessage(is_error=True)`。路径逃逸、文件不存在、非 UTF-8 和非唯一编辑属于预期工具错误，也回填模型，让模型有机会修正参数。取消信号不会降级成普通工具错误，而是终止本轮。
 
-`write/edit` 在写入前检查取消，写后再检查一次；本版尚未实现临时文件替换和事务恢复，因此进程在底层写入期间崩溃仍可能留下部分文件。
+`write/edit` 在写入前检查取消，写后再检查一次。审批完成后，写入会从稳定的项目根目录描述符逐级打开父目录，拒绝符号链接替换，再写入同目录临时文件并以 `os.replace()` 原子提交；`edit` 会先重读并拒绝覆盖审批期间变化的内容。这里没有跨进程锁或多文件事务，因此最终复验与替换之间仍不是通用并发事务，Bash 也不受这层路径保护。
 
 ## 6. 输出截断为何放在 Registry
 

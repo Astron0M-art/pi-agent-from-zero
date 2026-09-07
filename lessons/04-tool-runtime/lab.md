@@ -6,7 +6,7 @@
 python lessons/04-tool-runtime/snapshot/agent.py
 ```
 
-输入 `y`。观察第一次 `ModelRequest.tools` 中的 bash 定义，然后确认 ToolResult 的 `tool_call_id == "call-1"`，最终回答来自第二次模型请求。
+输入 `/bash pwd` 和 `y`。观察第一次 `ModelRequest.tools` 中的 bash 定义，然后确认 ToolResult 的 `tool_call_id` 与请求 ID 相同，最终回答来自第二次模型请求。
 
 ## 实验 2：边界任务——错误参数
 

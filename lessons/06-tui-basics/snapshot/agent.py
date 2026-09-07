@@ -14,21 +14,23 @@ from events import (
     AssistantCompleted,
     CancellationToken,
     Cancelled,
+    DeadlineExceeded,
     ProviderCompleted,
+    ProviderFailed,
     ProviderTextDelta,
     TextDelta,
     ToolCompleted,
     ToolStarted,
 )
 from messages import AssistantMessage, Message, ToolCall, ToolResultMessage, UserMessage
-from providers import FakeModel, ModelRequest
+from providers import FakeModel, ModelRequest, Provider
 from tools import ToolRegistry
 
 
 class Agent:
     def __init__(
         self,
-        provider: FakeModel,
+        provider: Provider,
         tools: ToolRegistry,
         *,
         max_turns: int = 8,
@@ -40,20 +42,25 @@ class Agent:
         self.max_tool_calls = max_tool_calls
         self.messages: list[Message] = []
 
-    def stream(self, prompt: str) -> Iterator[AgentEvent]:
-        token = CancellationToken()
+    def stream(
+        self, prompt: str, *, cancellation: CancellationToken | None = None
+    ) -> Iterator[AgentEvent]:
+        token = cancellation or CancellationToken()
         yield AgentStarted(prompt)
-        self.messages.append(UserMessage(prompt))
-        tool_calls_used = 0
         try:
+            token.checkpoint()
+            self.messages.append(UserMessage(prompt))
+            tool_calls_used = 0
             for _ in range(self.max_turns):
                 reply = yield from self._reply(token)
                 self.messages.append(reply)
                 yield AssistantCompleted(reply)
+                token.checkpoint()
                 if not reply.tool_calls:
                     yield AgentCompleted(reply.content)
                     return
                 for call in reply.tool_calls:
+                    token.checkpoint()
                     if tool_calls_used >= self.max_tool_calls:
                         yield AgentFailed(
                             "budget", f"agent exceeded {self.max_tool_calls} tool calls"
@@ -64,9 +71,15 @@ class Agent:
                     result = self.tools.execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
+                    token.checkpoint()
+            token.checkpoint()
             yield AgentFailed("budget", f"agent exceeded {self.max_turns} turns")
         except Cancelled as error:
             yield AgentFailed("cancelled", str(error))
+        except DeadlineExceeded as error:
+            yield AgentFailed("timeout", str(error))
+        except ProtocolError as error:
+            yield AgentFailed("protocol", str(error))
         except RuntimeError as error:
             yield AgentFailed("provider", str(error))
 
@@ -74,17 +87,46 @@ class Agent:
         request = ModelRequest(tuple(self.messages), self.tools.definitions)
         deltas: list[str] = []
         completed: AssistantMessage | None = None
-        for event in self.provider.stream(request, token):
+        provider_failure: ProviderFailed | None = None
+        terminal_seen = False
+        for event in self._provider_events(request, token):
+            token.checkpoint()
+            if terminal_seen:
+                raise ProtocolError("provider emitted an event after its terminal event")
             if isinstance(event, ProviderTextDelta):
                 deltas.append(event.delta)
                 yield TextDelta(event.delta)
             elif isinstance(event, ProviderCompleted):
                 completed = event.message
+                terminal_seen = True
+            elif isinstance(event, ProviderFailed):
+                provider_failure = event
+                terminal_seen = True
+            else:
+                raise ProtocolError(f"unknown provider event: {type(event).__name__}")
+        token.checkpoint()
+        if provider_failure is not None:
+            if provider_failure.kind == "cancelled":
+                raise Cancelled(provider_failure.message)
+            raise RuntimeError(provider_failure.message)
         if completed is None:
-            raise RuntimeError("provider stream ended without completed event")
+            raise ProtocolError("provider stream ended without completed event")
         if deltas and "".join(deltas) != completed.content:
-            raise RuntimeError("streamed text does not match completed message")
+            raise ProtocolError("streamed text does not match completed message")
         return completed
+
+    def _provider_events(self, request: ModelRequest, token: CancellationToken):
+        try:
+            yield from self.provider.stream(request, token)
+        except (Cancelled, DeadlineExceeded, ProtocolError):
+            raise
+        except Exception as error:
+            token.checkpoint()
+            raise RuntimeError(str(error)) from error
+
+
+class ProtocolError(RuntimeError):
+    pass
 
 
 def ask(operation: str) -> bool:

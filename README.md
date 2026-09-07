@@ -12,7 +12,9 @@
 
 ## 项目状态
 
-当前代码版本：`v0.6.1` 可信度维护版，教学行为仍对应 [`v0.6.0` TUI 状态与文本帧渲染基础](lessons/06-tui-basics/README.md)。它把 Agent 事件投影为输入区、消息时间线、工具卡片、固定状态栏和有限视口，并保持显示状态与模型上下文分离。当前演示只输出一次确定性文本帧，**不是**支持 raw mode、键盘事件循环和差分重绘的完整交互式 TUI。
+当前源码版本：`v0.6.2` 累计交互修正版，教学主题仍对应 [`v0.6.0` TUI 状态与文本帧渲染基础](lessons/06-tui-basics/README.md)。默认 CLI 会持续读取输入，并在同一个 Agent 中保留多轮内存上下文；普通文字由确定性离线 Provider 回显，`/read`、`/grep`、`/write`、`/edit`、`/bash` 会进入真实工具运行时，写、改、执行必须逐次输入 `y` 或 `yes` 才会发生副作用。
+
+显示层会把事件投影为消息时间线、工具卡片、状态栏和有限视口。它已有行式输入循环，但仍**不是**支持 raw mode、逐键编辑、IME 和差分重绘的完整交互式 TUI，也没有接入真实大模型。
 
 ## 5 分钟跑通最新版本
 
@@ -21,24 +23,40 @@
 ```bash
 python3.11 --version
 python3.11 -m venv .venv
-.venv/bin/python lessons/06-tui-basics/snapshot/tui.py
+.venv/bin/python -m pip install -e '.[dev]'
+.venv/bin/pi-agent-zero
 ```
 
-演示会用离线 FakeModel 搜索仓库 README，并输出一块 18 行的确定性文本帧，不需要 API Key，也不会修改已跟踪源码或项目数据；解释器可能生成被忽略的 `__pycache__`。渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
+启动后可按顺序输入：
+
+```text
+你好
+/read README.md
+/grep "Pi Agent" README.md
+/bash pwd
+y
+/exit
+```
+
+这条路径同时验证多轮上下文、Coding Tools、Bash 审批、事件流和 TUI 文本帧。离线 Provider 只用于观察控制流，回答质量不代表真实模型。`/write <path> <content>` 和 `/edit <path> <old> <new>` 也可使用，但会请求审批；read、grep、write、edit 会校验路径是否位于启动时的工作目录，写入还会在审批后重新验证。它不是对恶意并发文件系统变更的完整沙箱。Bash 只把该目录作为初始 cwd，获批命令仍可访问目录外部。原来的一次性 README 搜索演示保留为 `.venv/bin/pi-agent-zero --demo`。
+
+渲染器按 Python 字符数预算名义宽度，不保证 Unicode 文本占用相同数量的终端显示列。冻结快照的独立测试：
 
 ```bash
 .venv/bin/python -m unittest discover -s lessons/06-tui-basics/tests -v
 ```
 
-想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)；旧版本冻结快照不会被最新实现覆盖。
+想从最小循环开始，请按顺序进入 [`lessons/`](lessons/README.md)。主分支中的课程快照经过累计合同修正；已发布 tag 保持不变，可用于核对当时的原始状态。
 
 ## 教学原则
 
-- 每一版都能独立运行，不要求先理解最终工程。
+- 每一版都能独立运行，并在上一版终端体验上增加一个主要概念。
 - 每项能力都对应真实 Pi 源码位置，并明确相同点与简化点。
 - 每一版都有实验、故障注入、测试和理解检验。
 - 先证明行为正确，再增加功能和抽象。
 - 不把 MCP 当成权限系统，不把角色提示词当成 Multi-Agent。
+
+版本能力是否真正累计，以[能力矩阵](docs/capability-matrix.md)及跨版本端到端测试为准，不以 Roadmap 或功能名称代替运行证据。
 
 ## 计划中的学习路径
 

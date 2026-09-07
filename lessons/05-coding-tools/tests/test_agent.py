@@ -103,6 +103,60 @@ class CodingToolsTests(unittest.TestCase):
             self.assertTrue(ambiguous.is_error)
             self.assertEqual(target.read_text(encoding="utf-8"), "x x")
 
+    def test_write_rejects_parent_symlink_swapped_during_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            parent = root / "notes"
+            parent.mkdir()
+            outside = root.parent / f"{root.name}-outside"
+            outside.mkdir()
+
+            def swap_parent(_operation: str) -> bool:
+                parent.rename(root / "notes-before-approval")
+                parent.symlink_to(outside, target_is_directory=True)
+                return True
+
+            try:
+                registry = ToolRegistry(create_coding_tools(root, swap_parent))
+                result = registry.execute(
+                    ToolCall(
+                        "write-1",
+                        "write",
+                        {"path": "notes/escaped.txt", "content": "blocked"},
+                    ),
+                    CancellationToken(),
+                )
+
+                self.assertTrue(result.is_error)
+                self.assertTrue(result.content.startswith("could not write file:"))
+                self.assertFalse((outside / "escaped.txt").exists())
+            finally:
+                outside.rmdir()
+
+    def test_edit_rejects_file_changed_during_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "app.py"
+            target.write_text("old\n", encoding="utf-8")
+
+            def change_file(_operation: str) -> bool:
+                target.write_text("concurrent change\n", encoding="utf-8")
+                return True
+
+            registry = ToolRegistry(create_coding_tools(root, change_file))
+            result = registry.execute(
+                ToolCall(
+                    "edit-1",
+                    "edit",
+                    {"path": "app.py", "old_text": "old", "new_text": "new"},
+                ),
+                CancellationToken(),
+            )
+
+            self.assertTrue(result.is_error)
+            self.assertIn("changed while awaiting approval", result.content)
+            self.assertEqual(target.read_text(encoding="utf-8"), "concurrent change\n")
+
     def test_all_results_are_truncated_before_returning_to_model(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

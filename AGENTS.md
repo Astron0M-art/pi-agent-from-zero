@@ -24,6 +24,9 @@ Maintain this repository as a Chinese-first, source-grounded teaching project. A
 ## Quality
 
 - Prefer deterministic FakeModel tests over paid model calls.
+- Treat the course as cumulative evolution: current `src` and the default CLI must retain all previously shipped observable capabilities while adding the new lesson concept.
+- Keep the v0.1 terminal baseline in every later lesson: no-argument multi-turn startup, in-process context, Bash behind explicit `y`/`yes`, denial without side effects, and clean command/EOF/interrupt exit.
+- A release must test its new behavior, all historical capabilities, and at least one end-to-end path that combines two or more existing capabilities. Lesson-only or parallel implementations that do not enter the current runtime are blockers.
 - Separate model-visible context, runtime events, persistent session data, and TUI history.
 - Treat MCP capability discovery as separate from authorization.
 - Do not call a fixed workflow Multi-Agent without independent model instances and a demonstrated engineering benefit.
