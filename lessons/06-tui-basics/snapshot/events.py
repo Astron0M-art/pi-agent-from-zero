@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from threading import Event
 from typing import Literal, TypeAlias
@@ -13,10 +14,15 @@ class Cancelled(RuntimeError):
     pass
 
 
+class DeadlineExceeded(TimeoutError):
+    pass
+
+
 class CancellationToken:
-    def __init__(self) -> None:
+    def __init__(self, timeout: float | None = None) -> None:
         self._event = Event()
         self._reason = "cancelled by caller"
+        self._deadline = None if timeout is None else time.monotonic() + timeout
 
     def cancel(self, reason: str = "cancelled by caller") -> None:
         self._reason = reason
@@ -25,6 +31,8 @@ class CancellationToken:
     def checkpoint(self) -> None:
         if self._event.is_set():
             raise Cancelled(self._reason)
+        if self._deadline is not None and time.monotonic() >= self._deadline:
+            raise DeadlineExceeded("agent run exceeded its timeout")
 
 
 @dataclass(frozen=True)
@@ -37,7 +45,13 @@ class ProviderCompleted:
     message: AssistantMessage
 
 
-ProviderEvent: TypeAlias = ProviderTextDelta | ProviderCompleted
+@dataclass(frozen=True)
+class ProviderFailed:
+    message: str
+    kind: Literal["error", "cancelled"] = "error"
+
+
+ProviderEvent: TypeAlias = ProviderTextDelta | ProviderCompleted | ProviderFailed
 
 
 @dataclass(frozen=True)
@@ -72,7 +86,7 @@ class AgentCompleted:
 
 @dataclass(frozen=True)
 class AgentFailed:
-    kind: Literal["cancelled", "provider", "protocol", "budget"]
+    kind: Literal["cancelled", "timeout", "provider", "protocol", "budget"]
     message: str
 
 

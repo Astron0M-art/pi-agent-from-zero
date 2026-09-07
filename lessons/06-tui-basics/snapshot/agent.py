@@ -14,7 +14,9 @@ from events import (
     AssistantCompleted,
     CancellationToken,
     Cancelled,
+    DeadlineExceeded,
     ProviderCompleted,
+    ProviderFailed,
     ProviderTextDelta,
     TextDelta,
     ToolCompleted,
@@ -40,12 +42,15 @@ class Agent:
         self.max_tool_calls = max_tool_calls
         self.messages: list[Message] = []
 
-    def stream(self, prompt: str) -> Iterator[AgentEvent]:
-        token = CancellationToken()
+    def stream(
+        self, prompt: str, *, cancellation: CancellationToken | None = None
+    ) -> Iterator[AgentEvent]:
+        token = cancellation or CancellationToken()
         yield AgentStarted(prompt)
-        self.messages.append(UserMessage(prompt))
-        tool_calls_used = 0
         try:
+            token.checkpoint()
+            self.messages.append(UserMessage(prompt))
+            tool_calls_used = 0
             for _ in range(self.max_turns):
                 reply = yield from self._reply(token)
                 self.messages.append(reply)
@@ -67,6 +72,8 @@ class Agent:
             yield AgentFailed("budget", f"agent exceeded {self.max_turns} turns")
         except Cancelled as error:
             yield AgentFailed("cancelled", str(error))
+        except DeadlineExceeded as error:
+            yield AgentFailed("timeout", str(error))
         except RuntimeError as error:
             yield AgentFailed("provider", str(error))
 
@@ -80,6 +87,10 @@ class Agent:
                 yield TextDelta(event.delta)
             elif isinstance(event, ProviderCompleted):
                 completed = event.message
+            elif isinstance(event, ProviderFailed):
+                if event.kind == "cancelled":
+                    raise Cancelled(event.message)
+                raise RuntimeError(event.message)
         if completed is None:
             raise RuntimeError("provider stream ended without completed event")
         if deltas and "".join(deltas) != completed.content:
