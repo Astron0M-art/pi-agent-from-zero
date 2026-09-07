@@ -108,7 +108,7 @@ class ProtocolError(RuntimeError):
 def ask(command: str) -> bool:
     try:
         answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
-    except (EOFError, KeyboardInterrupt):
+    except EOFError:
         print()
         return False
     return answer.strip().lower() in {"y", "yes"}
@@ -179,7 +179,11 @@ def repl(agent: Agent) -> None:
             return
         if not prompt:
             continue
-        print_turn(agent, prompt)
+        try:
+            print_turn(agent, prompt)
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
 
 
 def main() -> None:

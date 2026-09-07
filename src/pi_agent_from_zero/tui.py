@@ -374,7 +374,7 @@ def parse_tool_command(prompt: str, turn: int) -> tuple[str, ToolCall | None]:
 def _ask(operation: str) -> bool:
     try:
         answer = input(f"允许执行操作 `{operation}` 吗？[y/N] ")
-    except (EOFError, KeyboardInterrupt):
+    except EOFError:
         print()
         return False
     return answer.strip().lower() in {"y", "yes"}
@@ -407,7 +407,11 @@ def repl(app: TuiApp) -> None:
             return
         if not prompt:
             continue
-        _run_turn(app, prompt)
+        try:
+            _run_turn(app, prompt)
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
 
 
 def _finalize_demo_state(state: TuiState) -> tuple[TuiState, int]:

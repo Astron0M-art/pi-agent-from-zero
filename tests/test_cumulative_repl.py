@@ -33,6 +33,29 @@ def _run(entry: Path, transcript: str, cwd: Path) -> subprocess.CompletedProcess
     )
 
 
+def _start(entry: Path, cwd: Path) -> subprocess.Popen[str]:
+    return subprocess.Popen(
+        [sys.executable, str(entry)],
+        cwd=cwd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+
+
+def _read_until(process: subprocess.Popen[str], marker: str) -> str:
+    assert process.stdout is not None
+    output = ""
+    deadline = time.monotonic() + 5
+    while marker not in output and time.monotonic() < deadline:
+        character = process.stdout.read(1)
+        if not character:
+            break
+        output += character
+    return output
+
+
 @pytest.mark.parametrize(("version", "entry"), LESSON_ENTRIES)
 def test_every_version_keeps_multi_turn_bash_and_yes(
     version: str, entry: Path, tmp_path: Path
@@ -92,22 +115,8 @@ def test_every_version_accepts_full_yes(version: str, entry: Path, tmp_path: Pat
 def test_every_version_exits_cleanly_on_interrupt(
     version: str, entry: Path, tmp_path: Path
 ) -> None:
-    process = subprocess.Popen(
-        [sys.executable, str(entry)],
-        cwd=tmp_path,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    assert process.stdout is not None
-    output = ""
-    deadline = time.monotonic() + 5
-    while "Pi Agent > " not in output and time.monotonic() < deadline:
-        character = process.stdout.read(1)
-        if not character:
-            break
-        output += character
+    process = _start(entry, tmp_path)
+    output = _read_until(process, "Pi Agent > ")
     assert "Pi Agent > " in output, f"{version}: prompt not displayed"
 
     process.send_signal(signal.SIGINT)
@@ -116,6 +125,33 @@ def test_every_version_exits_cleanly_on_interrupt(
 
     assert process.returncode == 0, f"{version}: {output}\n{stderr}"
     assert "再见" in output
+
+
+@pytest.mark.parametrize(("version", "entry"), LESSON_ENTRIES)
+@pytest.mark.parametrize("phase", ["approval", "running"])
+def test_every_version_exits_cleanly_when_tool_is_interrupted(
+    version: str, entry: Path, phase: str, tmp_path: Path
+) -> None:
+    process = _start(entry, tmp_path)
+    output = _read_until(process, "Pi Agent > ")
+    assert process.stdin is not None
+    command = "pwd" if phase == "approval" else "sleep 5"
+    process.stdin.write(f"/bash {command}\n")
+    process.stdin.flush()
+    output += _read_until(process, "[y/N] ")
+    assert "[y/N] " in output, f"{version}: approval prompt not displayed"
+    if phase == "running":
+        process.stdin.write("y\n")
+        process.stdin.flush()
+        time.sleep(0.1)
+
+    process.send_signal(signal.SIGINT)
+    remaining_output, stderr = process.communicate(timeout=5)
+    output += remaining_output
+
+    assert process.returncode == 0, f"{version}: {output}\n{stderr}"
+    assert "再见" in output
+    assert "Traceback" not in stderr
 
 
 @pytest.mark.parametrize(
@@ -160,6 +196,11 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
         "from providers import FakeModel\n"
         f"{registry_import}"
         f"def make(provider):\n    return {constructor}\n"
+        "class DirectProvider:\n"
+        "    def __init__(self, factory):\n"
+        "        self.factory = factory\n"
+        "    def stream(self, request, token):\n"
+        "        yield from self.factory(request, token)\n"
         "cancelled = CancellationToken()\n"
         "cancelled.cancel('test stop')\n"
         "first = make(FakeModel([]))\n"
@@ -172,14 +213,14 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
         "    yield ProviderTextDelta('half')\n"
         "    token.cancel('mid-stream stop')\n"
         "    yield ProviderCompleted(AssistantMessage('half'))\n"
-        "mid = make(FakeModel([cancel_mid]))\n"
+        "mid = make(DirectProvider(cancel_mid))\n"
         "mid_events = list(mid.stream('mid', cancellation=CancellationToken()))\n"
         "print(mid_events[-1].kind, len(mid.messages))\n"
         "def expire_mid(_request, _token):\n"
         "    yield ProviderTextDelta('half')\n"
         "    time.sleep(0.01)\n"
         "    yield ProviderCompleted(AssistantMessage('half'))\n"
-        "late = make(FakeModel([expire_mid]))\n"
+        "late = make(DirectProvider(expire_mid))\n"
         "late_events = list(late.stream('late', cancellation=CancellationToken(0.001)))\n"
         "print(late_events[-1].kind, len(late.messages))\n"
         "bad = make(FakeModel([[ProviderTextDelta('a'), "

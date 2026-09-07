@@ -125,7 +125,7 @@ class ReplProvider:
 def ask(command: str) -> bool:
     try:
         answer = input(f"允许执行 bash 命令 `{command}` 吗？[y/N] ")
-    except (EOFError, KeyboardInterrupt):
+    except EOFError:
         print()
         return False
     return answer.strip().lower() in {"y", "yes"}
@@ -146,7 +146,11 @@ def repl(agent: Agent) -> None:
             return
         if not prompt:
             continue
-        print(f"Assistant > {agent.run(prompt)}")
+        try:
+            print(f"Assistant > {agent.run(prompt)}")
+        except KeyboardInterrupt:
+            print("\n再见。")
+            return
 
 
 def main() -> None:
