@@ -295,7 +295,7 @@ def _mark_required_demo_tool_failure(app: TuiApp) -> bool:
     failed = failed_cards[-1]
     app.state = reduce_event(
         app.state,
-        AgentFailed("demo", f"required {failed.name} tool failed"),
+        AgentFailed("runtime", f"required {failed.name} tool failed"),
     )
     return True
 
