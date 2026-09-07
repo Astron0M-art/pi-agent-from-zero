@@ -18,4 +18,4 @@
 - `tests/test_tui.py` 对安装后的 `pi-agent-zero` 组合多轮对话、Bash 审批、Coding Tools、事件归约与文本帧。
 - `scripts/run_lesson_tests.py` 在隔离进程中运行每个 lesson 自己的正常、边界与失败路径测试。
 
-所有入口使用离线确定性 Provider，因此可验证的是协议、控制流和副作用，不是自然语言回答质量。v0.6 的“交互”仍是行式 `input()` 循环；raw mode、逐键编辑、IME 和差分重绘尚未实现。
+所有入口都使用离线确定性响应逻辑：v0.1 是普通可调用模型，v0.2 起才引入 Provider 抽象。因此可验证的是协议、控制流和副作用，不是自然语言回答质量。v0.6 的“交互”仍是行式 `input()` 循环；raw mode、逐键编辑、IME 和差分重绘尚未实现。

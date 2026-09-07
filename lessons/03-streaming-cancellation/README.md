@@ -44,5 +44,5 @@ python -m unittest discover -s lessons/03-streaming-cancellation/tests -v
 - `Provider.complete()` 被 `Provider.stream()` 替代，这是 0.x 教学 API 的刻意演进。
 - 当前工程的 `Agent.run()` 仍保留为一次性结果包装器；冻结快照聚焦 `stream()`。
 - Python 生成器只有被消费时才运行；调用 `stream()` 本身不会启动后台线程。
-- Bash 子进程可被当前工程终止，但孙进程和跨平台进程组隔离尚未解决。
+- 在 POSIX 系统上，当前工程会为 Bash 建立独立进程组，并在取消或超时时终止该组；主动脱离该进程组的后代仍可能逃逸，Windows 回退路径也尚未独立验证。
 - 事件未持久化，不是 Trace；会话恢复与 Trace 分别留到 v0.9.0、v0.14.0。
