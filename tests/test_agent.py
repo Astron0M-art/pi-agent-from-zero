@@ -174,6 +174,11 @@ def test_zero_timeout_stops_before_mutating_history_or_calling_provider() -> Non
         ([ProviderFailed("上游坏了")], "provider"),
         ([ProviderTextDelta("甲"), ProviderCompleted(AssistantMessage("乙"))], "protocol"),
         ([ProviderTextDelta("没有终点")], "protocol"),
+        (
+            [ProviderFailed("first"), ProviderCompleted(AssistantMessage("too late"))],
+            "protocol",
+        ),
+        ([object(), ProviderCompleted(AssistantMessage("ignored?"))], "protocol"),
     ],
 )
 def test_provider_failures_have_explicit_terminal_event(stream: list, kind: str) -> None:

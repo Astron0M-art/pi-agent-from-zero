@@ -82,6 +82,7 @@ class Agent:
         request = ModelRequest(tuple(self.messages), self.tools.definitions)
         deltas: list[str] = []
         completed: AssistantMessage | None = None
+        provider_failure: ProviderFailed | None = None
         terminal_seen = False
         for event in self.provider.stream(request, token):
             token.checkpoint()
@@ -94,11 +95,15 @@ class Agent:
                 completed = event.message
                 terminal_seen = True
             elif isinstance(event, ProviderFailed):
+                provider_failure = event
                 terminal_seen = True
-                if event.kind == "cancelled":
-                    raise Cancelled(event.message)
-                raise RuntimeError(event.message)
+            else:
+                raise ProtocolError(f"unknown provider event: {type(event).__name__}")
         token.checkpoint()
+        if provider_failure is not None:
+            if provider_failure.kind == "cancelled":
+                raise Cancelled(provider_failure.message)
+            raise RuntimeError(provider_failure.message)
         if completed is None:
             raise ProtocolError("provider stream ended without completed event")
         if deltas and "".join(deltas) != completed.content:

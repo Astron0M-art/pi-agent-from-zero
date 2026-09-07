@@ -191,7 +191,8 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
     program = (
         "import time\n"
         "from agent import Agent\n"
-        "from events import CancellationToken, ProviderCompleted, ProviderTextDelta\n"
+        "from events import CancellationToken, ProviderCompleted, ProviderFailed, "
+        "ProviderTextDelta\n"
         "from messages import AssistantMessage\n"
         "from providers import FakeModel\n"
         f"{registry_import}"
@@ -233,6 +234,18 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
         "post = make(DirectProvider(after_terminal))\n"
         "post_events = list(post.stream('post'))\n"
         "print(post_events[-1].kind, len(post.messages))\n"
+        "def failed_then_event(_request, _token):\n"
+        "    yield ProviderFailed('first')\n"
+        "    yield ProviderCompleted(AssistantMessage('too late'))\n"
+        "failed_post = make(DirectProvider(failed_then_event))\n"
+        "failed_post_events = list(failed_post.stream('failed-post'))\n"
+        "print(failed_post_events[-1].kind, len(failed_post.messages))\n"
+        "def unknown_event(_request, _token):\n"
+        "    yield object()\n"
+        "    yield ProviderCompleted(AssistantMessage('ignored?'))\n"
+        "unknown = make(DirectProvider(unknown_event))\n"
+        "unknown_events = list(unknown.stream('unknown'))\n"
+        "print(unknown_events[-1].kind, len(unknown.messages))\n"
         f"{tool_timeout_program}"
     )
     result = subprocess.run(
@@ -250,6 +263,8 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
         "timeout 0",
         "cancelled 1",
         "timeout 1",
+        "protocol 1",
+        "protocol 1",
         "protocol 1",
         "protocol 1",
     ]

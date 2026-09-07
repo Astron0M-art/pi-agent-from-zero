@@ -155,6 +155,7 @@ class Agent:
         )
         deltas: list[str] = []
         completed: AssistantMessage | None = None
+        provider_failure: ProviderFailed | None = None
         terminal_seen = False
         try:
             for event in self.provider.stream(request, cancellation):
@@ -168,10 +169,8 @@ class Agent:
                     completed = event.message
                     terminal_seen = True
                 elif isinstance(event, ProviderFailed):
+                    provider_failure = event
                     terminal_seen = True
-                    if event.kind == "cancelled":
-                        raise CancellationRequested(event.message)
-                    raise _ProviderError(event.message)
                 else:
                     raise _ProtocolError(f"unknown provider event: {type(event).__name__}")
         except (CancellationRequested, DeadlineExceeded, _ProviderError, _ProtocolError):
@@ -180,6 +179,10 @@ class Agent:
             raise _ProviderError(str(error)) from error
 
         cancellation.checkpoint()
+        if provider_failure is not None:
+            if provider_failure.kind == "cancelled":
+                raise CancellationRequested(provider_failure.message)
+            raise _ProviderError(provider_failure.message)
         if completed is None:
             raise _ProtocolError("provider stream ended without a terminal event")
         streamed_text = "".join(deltas)
