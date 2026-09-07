@@ -129,6 +129,7 @@ class Agent:
                 check=False,
             )
         except subprocess.TimeoutExpired:
+            token.checkpoint()
             return ToolResultMessage(
                 call.id,
                 call.name,

@@ -91,6 +91,7 @@ class ToolRegistry:
         except (Cancelled, DeadlineExceeded):
             raise
         except Exception as error:
+            token.checkpoint()
             return ToolResultMessage(call.id, call.name, f"tool execution failed: {error}", True)
 
 

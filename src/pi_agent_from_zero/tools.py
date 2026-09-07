@@ -245,8 +245,10 @@ class ToolRegistry:
         except SchemaValidationError as error:
             return self._error(call, f"invalid arguments: {error}")
         except ToolExecutionError as error:
+            cancellation.checkpoint()
             return self._error(call, str(error))
         except Exception as error:
+            cancellation.checkpoint()
             return self._error(call, f"tool execution failed: {error}")
 
     @staticmethod

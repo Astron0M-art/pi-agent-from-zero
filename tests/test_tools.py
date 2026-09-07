@@ -180,6 +180,20 @@ def test_registry_checks_deadline_after_non_cooperative_handler() -> None:
         )
 
 
+def test_registry_deadline_wins_over_late_tool_error() -> None:
+    def fail_late(_arguments: Mapping[str, object], _token: CancellationToken) -> ToolOutcome:
+        time.sleep(0.01)
+        raise ToolExecutionError("late tool error")
+
+    registry = ToolRegistry([Tool(definition(), fail_late)])
+
+    with pytest.raises(DeadlineExceeded, match="exceeded its timeout"):
+        registry.execute(
+            ToolCall("late-1", "echo", {"message": "x"}),
+            CancellationToken(0.001),
+        )
+
+
 def test_bash_interrupt_stops_child_before_propagating(monkeypatch, tmp_path) -> None:
     class InterruptedProcess:
         returncode = -15
