@@ -302,8 +302,16 @@ def create_bash_tool(
 
         started_at = time.monotonic()
         while True:
+            remaining = timeout_seconds - (time.monotonic() - started_at)
+            if remaining <= 0:
+                _stop_process(process)
+                return ToolOutcome(f"command timed out after {timeout_seconds:g}s", is_error=True)
             try:
-                stdout, stderr = process.communicate(timeout=0.05)
+                stdout, stderr = process.communicate(timeout=min(0.05, remaining))
+                if time.monotonic() - started_at >= timeout_seconds:
+                    return ToolOutcome(
+                        f"command timed out after {timeout_seconds:g}s", is_error=True
+                    )
                 break
             except KeyboardInterrupt:
                 _stop_process(process)

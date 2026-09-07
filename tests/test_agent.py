@@ -342,3 +342,23 @@ def test_cancellation_after_tool_completed_prevents_next_provider_call(tmp_path:
 
     assert observed[-1] == AgentFailed("cancelled", "stop after tool")
     assert len(fake.requests) == 1
+
+
+def test_deadline_after_tool_completed_prevents_next_provider_call(tmp_path: Path) -> None:
+    fake = FakeModel(
+        [
+            completed(AssistantMessage(tool_calls=(bash_call("true"),))),
+            completed(AssistantMessage("must not be requested")),
+        ]
+    )
+    events = Agent(fake, bash_registry(cwd=tmp_path)).stream("运行", timeout_seconds=0.01)
+    observed = []
+    for event in events:
+        observed.append(event)
+        if isinstance(event, ToolCompleted):
+            time.sleep(0.02)
+            break
+    observed.extend(events)
+
+    assert observed[-1].kind == "timeout"
+    assert len(fake.requests) == 1

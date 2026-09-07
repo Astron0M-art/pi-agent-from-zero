@@ -140,7 +140,7 @@ def test_raw_tool_summary_escapes_terminal_controls(capsys) -> None:
             "additionalProperties": False,
         },
     )
-    tool = Tool(definition, lambda _arguments, _token: ToolOutcome("\x1b]0;owned\x07"))
+    tool = Tool(definition, lambda _arguments, _token: ToolOutcome("\x1b]0;owned\x07\x9b"))
     fake = FakeModel(
         [
             [
@@ -158,7 +158,8 @@ def test_raw_tool_summary_escapes_terminal_controls(capsys) -> None:
 
     assert "\x1b" not in output
     assert "\x07" not in output
-    assert "TOOL> \\x1b]0;owned\\x07" in output
+    assert "\x9b" not in output
+    assert "TOOL> \\x1b]0;owned\\x07\\x9b" in output
 
 
 def test_raw_tool_summary_keeps_line_breaks_without_escaping_them(capsys) -> None:

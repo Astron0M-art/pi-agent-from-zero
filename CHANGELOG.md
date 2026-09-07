@@ -31,6 +31,7 @@
 - 当前 Registry 与 v0.4–v0.6 冻结 Registry 在处理器返回或抛出普通工具异常后重新检查取消和 deadline；v0.3 也在 Bash 返回或命令超时后检查，避免过期运行先提交任何工具结果。
 - v0.3 以后的 Agent 在最终成功、Provider 异常和 Registry 早期错误边界统一重查停止 token；冻结 Provider 的任意普通异常也会归一为单一 `AgentFailed`，不再逸出事件协议。
 - Agent 在 `ToolCompleted` 被消费后、下一次 Provider 请求前再次检查停止 token；文本安全转义同时覆盖 C0、DEL 和 C1 控制字符。
+- 当前 Bash 工具按剩余命令预算缩短轮询窗口，并在进程返回时复核耗时，避免极短 timeout 被固定轮询粒度吞掉。
 
 ## [0.6.1] - 2026-09-05
 

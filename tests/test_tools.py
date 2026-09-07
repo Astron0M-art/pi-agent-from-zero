@@ -269,3 +269,14 @@ def test_bash_deadline_stops_background_child_without_waiting_for_it(tmp_path) -
 
     assert elapsed < 1
     assert child_stopped is True
+
+
+def test_bash_command_timeout_shorter_than_poll_slice_is_not_reported_success(
+    tmp_path,
+) -> None:
+    bash = create_bash_tool(lambda _command: True, cwd=tmp_path, timeout_seconds=0.001)
+
+    outcome = bash.execute({"command": "sleep 0.01"}, CancellationToken())
+
+    assert outcome.is_error is True
+    assert outcome.content == "command timed out after 0.001s"
