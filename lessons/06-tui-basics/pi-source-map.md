@@ -22,6 +22,6 @@
 ## 不能得出的结论
 
 - Pi 使用不可变 Reducer：上游主要通过组件实例和事件回调更新；Reducer 是本课为了显式状态转移采用的教学设计；
-- Python 字符长度等于终端显示列宽；CJK、emoji 与 ANSI 需要专门的 visible-width 处理；
+- Python 字符长度等于终端显示列宽；本课会转义终端控制字符，但 CJK 与 emoji 仍需要专门的 visible-width 处理；
 - 最终打印一帧等价于 Pi 的差分终端渲染；
 - TUI 状态可以替代 Session、Trace 或模型消息。

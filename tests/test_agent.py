@@ -249,6 +249,19 @@ def test_command_timeout_is_a_tool_result_and_agent_can_continue(tmp_path: Path)
     assert answer == "已处理超时"
 
 
+def test_run_deadline_after_short_bash_does_not_emit_tool_success(tmp_path: Path) -> None:
+    call = bash_call("sleep 0.02")
+    fake = FakeModel([completed(AssistantMessage(tool_calls=(call,)))])
+    agent = Agent(fake, bash_registry(cwd=tmp_path))
+
+    events = list(agent.stream("运行", timeout_seconds=0.001))
+
+    assert events[-1].kind == "timeout"
+    assert ToolStarted(call) in events
+    assert not any(isinstance(event, ToolCompleted) for event in events)
+    assert len(agent.messages) == 2
+
+
 def test_model_turn_budget_exposes_failure_kind(tmp_path: Path) -> None:
     fake = FakeModel(
         [

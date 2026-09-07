@@ -42,7 +42,7 @@ TuiRenderer(width, height) --> deterministic frame
 
 ## 4. 副作用在哪里
 
-Reducer 和 Renderer 都是纯内存计算。真实副作用仍只发生在 v0.5 的工具层。CLI 在每个 prompt 完成后 `print()` 当前帧是显示副作用，不改变 Agent 任务结果。
+Reducer 和 Renderer 都是纯内存计算。真实副作用仍只发生在 v0.5 的工具层。CLI 在每个 prompt 完成后 `print()` 当前帧是显示副作用，不改变 Agent 任务结果；进入文本帧或额外 `TOOL>` 摘要前，不可信控制字符会被转换成可见的 `\\xNN` 文本。
 
 ## 5. 错误、取消与恢复
 

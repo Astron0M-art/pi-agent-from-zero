@@ -251,12 +251,25 @@ class TuiRenderer:
 
     @staticmethod
     def _row(content: str, width: int) -> str:
-        clipped = content[:width]
+        clipped = _safe_inline_text(content)[:width]
         return f"| {clipped.ljust(width)} |"
 
 
+def _safe_inline_text(content: str) -> str:
+    """Make terminal controls visible instead of letting content execute them."""
+
+    return "".join(
+        character if ord(character) >= 32 and ord(character) != 127 else f"\\x{ord(character):02x}"
+        for character in content
+    )
+
+
+def _safe_multiline_text(content: str) -> str:
+    return "\n".join(_safe_inline_text(line) for line in content.splitlines())
+
+
 def _wrap(prefix: str, content: str, width: int) -> list[str]:
-    normalized = " ".join(content.splitlines())
+    normalized = " ".join(_safe_inline_text(line) for line in content.splitlines())
     available = max(1, width - len(prefix))
     chunks = textwrap.wrap(normalized, width=available) or [""]
     continuation = " " * len(prefix)
@@ -385,7 +398,7 @@ def _run_turn(app: TuiApp, prompt: str) -> None:
     app.type_text(prompt)
     frames = list(app.frames())
     for card in app.state.tool_cards[existing_cards:]:
-        print(f"TOOL> {card.output}")
+        print(f"TOOL> {_safe_multiline_text(card.output)}")
     if frames:
         print(frames[-1])
 

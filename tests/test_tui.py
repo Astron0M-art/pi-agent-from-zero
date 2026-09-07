@@ -18,9 +18,12 @@ from pi_agent_from_zero import (
     ProviderCompleted,
     ProviderTextDelta,
     TextDeltaEvent,
+    Tool,
     ToolCall,
     ToolCard,
     ToolCompleted,
+    ToolDefinition,
+    ToolOutcome,
     ToolRegistry,
     ToolResultMessage,
     ToolStarted,
@@ -100,6 +103,82 @@ def test_renderer_has_fixed_viewport_and_keeps_input_and_status() -> None:
     assert "STATUS> running" in frame
 
 
+def test_renderer_escapes_terminal_control_sequences() -> None:
+    state = TuiState(
+        timeline=(MessageView("assistant", "safe\x1b]0;owned\x07text"),),
+        status_detail="bad\x1b[2Jstatus",
+    )
+
+    frame = TuiRenderer(width=72, height=10).render(state)
+
+    assert "\x1b" not in frame
+    assert "\x07" not in frame
+    assert "\\x1b]0;owned\\x07" in frame
+    assert "\\x1b[2J" in frame
+
+
+def test_raw_tool_summary_escapes_terminal_controls(capsys) -> None:
+    definition = ToolDefinition(
+        "bash",
+        "Return hostile terminal text.",
+        {
+            "type": "object",
+            "properties": {"command": {"type": "string"}},
+            "required": ["command"],
+            "additionalProperties": False,
+        },
+    )
+    tool = Tool(definition, lambda _arguments, _token: ToolOutcome("\x1b]0;owned\x07"))
+    fake = FakeModel(
+        [
+            [
+                ProviderCompleted(
+                    AssistantMessage(tool_calls=(ToolCall("bash-1", "bash", {"command": "x"}),))
+                )
+            ],
+            [ProviderCompleted(AssistantMessage("done"))],
+        ]
+    )
+    app = TuiApp(Agent(fake, ToolRegistry([tool])))
+
+    tui_module._run_turn(app, "run")
+    output = capsys.readouterr().out
+
+    assert "\x1b" not in output
+    assert "\x07" not in output
+    assert "TOOL> \\x1b]0;owned\\x07" in output
+
+
+def test_raw_tool_summary_keeps_line_breaks_without_escaping_them(capsys) -> None:
+    definition = ToolDefinition(
+        "bash",
+        "Return two safe lines.",
+        {
+            "type": "object",
+            "properties": {"command": {"type": "string"}},
+            "required": ["command"],
+            "additionalProperties": False,
+        },
+    )
+    tool = Tool(definition, lambda _arguments, _token: ToolOutcome("first\nsecond\n"))
+    fake = FakeModel(
+        [
+            [
+                ProviderCompleted(
+                    AssistantMessage(tool_calls=(ToolCall("bash-1", "bash", {"command": "x"}),))
+                )
+            ],
+            [ProviderCompleted(AssistantMessage("done"))],
+        ]
+    )
+
+    tui_module._run_turn(TuiApp(Agent(fake, ToolRegistry([tool]))), "run")
+    output = capsys.readouterr().out
+
+    assert "TOOL> first\nsecond\n" in output
+    assert "\\x0a" not in output
+
+
 def test_tui_app_projects_agent_events_without_changing_model_history(tmp_path: Path) -> None:
     (tmp_path / "README.md").write_text("Pi Agent", encoding="utf-8")
     opening = "searching"
@@ -152,6 +231,7 @@ def test_module_cli_reports_success_when_demo_readme_exists() -> None:
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
 
     assert result.returncode == 0
@@ -167,6 +247,7 @@ def test_default_cli_keeps_context_across_chat_bash_and_chat(tmp_path: Path) -> 
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
 
     assert result.returncode == 0
@@ -188,6 +269,7 @@ def test_default_cli_combines_coding_tools_in_one_session(tmp_path: Path) -> Non
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
 
     assert result.returncode == 0
@@ -218,6 +300,7 @@ def test_module_cli_reports_failure_when_demo_readme_is_missing(tmp_path: Path) 
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
 
     assert result.returncode == 1
@@ -237,6 +320,7 @@ def test_module_cli_reports_failure_when_required_grep_has_no_matches(
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
 
     assert result.returncode == 1

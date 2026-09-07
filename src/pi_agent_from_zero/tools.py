@@ -311,6 +311,7 @@ def create_bash_tool(
                         f"command timed out after {timeout_seconds:g}s", is_error=True
                     )
 
+        cancellation.checkpoint()
         output = stdout + stderr
         is_error = process.returncode != 0
         if is_error:

@@ -93,6 +93,19 @@ class TuiBasicsTests(unittest.TestCase):
         self.assertIn("INPUT> next|", frame)
         self.assertIn("STATUS> running", frame)
 
+    def test_renderer_escapes_terminal_control_sequences(self) -> None:
+        state = TuiState(
+            timeline=(MessageView("assistant", "safe\x1b]0;owned\x07text"),),
+            status_detail="bad\x1b[2Jstatus",
+        )
+
+        frame = TuiRenderer(width=72, height=10).render(state)
+
+        self.assertNotIn("\x1b", frame)
+        self.assertNotIn("\x07", frame)
+        self.assertIn("\\x1b]0;owned\\x07", frame)
+        self.assertIn("\\x1b[2J", frame)
+
     def test_fake_model_drives_complete_tui_without_paid_api(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

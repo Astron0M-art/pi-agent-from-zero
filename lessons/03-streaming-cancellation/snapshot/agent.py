@@ -118,14 +118,22 @@ class Agent:
             return ToolResultMessage(call.id, call.name, "invalid tool call", True)
         if not self.approve(command):
             return ToolResultMessage(call.id, call.name, "user denied command", True)
-        completed = subprocess.run(
-            ["bash", "-lc", command],
-            cwd=self.cwd,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                ["bash", "-lc", command],
+                cwd=self.cwd,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return ToolResultMessage(
+                call.id,
+                call.name,
+                "command timed out after 5s",
+                True,
+            )
         output = completed.stdout + completed.stderr or "(no output)"
         return ToolResultMessage(call.id, call.name, output, completed.returncode != 0)
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import select
 import signal
 import subprocess
 import sys
@@ -48,11 +50,17 @@ def _read_until(process: subprocess.Popen[str], marker: str) -> str:
     assert process.stdout is not None
     output = ""
     deadline = time.monotonic() + 5
-    while marker not in output and time.monotonic() < deadline:
-        character = process.stdout.read(1)
-        if not character:
+    while marker not in output:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
             break
-        output += character
+        readable, _, _ = select.select([process.stdout], [], [], remaining)
+        if not readable:
+            break
+        chunk = os.read(process.stdout.fileno(), 4096)
+        if not chunk:
+            break
+        output += chunk.decode("utf-8", errors="replace")
     return output
 
 
