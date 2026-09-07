@@ -29,6 +29,7 @@
 - 当前 Bash 运行时在 POSIX 上为命令建立独立进程组；整轮取消、deadline、命令超时或 Ctrl+C 会有界地终止该组，不再等待仍持有输出管道的后台子进程。
 - 修复 `TuiRenderer(height=8)` 在内容溢出时因 `[-0:]` 保留全部正文、破坏固定高度的问题。
 - 当前 Registry 与 v0.4–v0.6 冻结 Registry 在处理器返回或抛出普通工具异常后重新检查取消和 deadline；v0.3 也在 Bash 返回或命令超时后检查，避免过期运行先提交任何工具结果。
+- v0.3 以后的 Agent 在最终成功、Provider 异常和 Registry 早期错误边界统一重查停止 token；冻结 Provider 的任意普通异常也会归一为单一 `AgentFailed`，不再逸出事件协议。
 
 ## [0.6.1] - 2026-09-05
 

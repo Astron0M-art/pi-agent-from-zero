@@ -222,6 +222,7 @@ class ToolRegistry:
         return self._definitions
 
     def execute(self, call: ToolCall, cancellation: CancellationToken) -> ToolResultMessage:
+        cancellation.checkpoint()
         tool = self._tools.get(call.name)
         if tool is None:
             return self._error(call, f"tool not found: {call.name}")
@@ -243,6 +244,7 @@ class ToolRegistry:
         except (CancellationRequested, DeadlineExceeded):
             raise
         except SchemaValidationError as error:
+            cancellation.checkpoint()
             return self._error(call, f"invalid arguments: {error}")
         except ToolExecutionError as error:
             cancellation.checkpoint()

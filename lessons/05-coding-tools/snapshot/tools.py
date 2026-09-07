@@ -104,12 +104,14 @@ class ToolRegistry:
         return tuple(tool.definition for tool in self._tools.values())
 
     def execute(self, call: ToolCall, token: CancellationToken) -> ToolResultMessage:
+        token.checkpoint()
         tool = self._tools.get(call.name)
         if tool is None:
             return ToolResultMessage(call.id, call.name, f"tool not found: {call.name}", True)
         try:
             arguments = validate_arguments(tool.definition.parameters, call.arguments)
         except ValueError as error:
+            token.checkpoint()
             return ToolResultMessage(call.id, call.name, f"invalid arguments: {error}", True)
         try:
             token.checkpoint()

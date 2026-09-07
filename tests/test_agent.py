@@ -229,6 +229,36 @@ def test_deadline_is_checked_after_provider_generator_finishes() -> None:
     assert agent.messages == [UserMessage("开始")]
 
 
+def test_deadline_is_checked_after_assistant_completed_is_consumed() -> None:
+    message = AssistantMessage("done")
+    agent = Agent(FakeModel([completed(message)]), ToolRegistry([]))
+    events = agent.stream("开始", timeout_seconds=0.01)
+
+    observed = []
+    for event in events:
+        observed.append(event)
+        if event == AssistantCompleted(message):
+            time.sleep(0.02)
+            break
+    observed.extend(events)
+
+    assert observed[-1].kind == "timeout"
+    assert AgentCompleted("done") not in observed
+
+
+def test_deadline_wins_when_provider_raises_late() -> None:
+    class LateFailureProvider:
+        def stream(self, _request: ModelRequest, _token: CancellationToken) -> Iterable:
+            time.sleep(0.02)
+            raise RuntimeError("late provider failure")
+
+    agent = Agent(LateFailureProvider(), ToolRegistry([]))
+
+    events = list(agent.stream("开始", timeout_seconds=0.001))
+
+    assert events[-1].kind == "timeout"
+
+
 def test_command_timeout_is_a_tool_result_and_agent_can_continue(tmp_path: Path) -> None:
     fake = FakeModel(
         [

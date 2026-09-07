@@ -56,10 +56,12 @@ class Agent:
                 reply = yield from self._reply(token)
                 self.messages.append(reply)
                 yield AssistantCompleted(reply)
+                token.checkpoint()
                 if not reply.tool_calls:
                     yield AgentCompleted(reply.content)
                     return
                 for call in reply.tool_calls:
+                    token.checkpoint()
                     if tool_calls_used >= self.max_tool_calls:
                         yield AgentFailed(
                             "budget", f"agent exceeded {self.max_tool_calls} tool calls"
@@ -70,6 +72,7 @@ class Agent:
                     result = self.tools.execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
+            token.checkpoint()
             yield AgentFailed("budget", f"agent exceeded {self.max_turns} turns")
         except Cancelled as error:
             yield AgentFailed("cancelled", str(error))
@@ -86,7 +89,7 @@ class Agent:
         completed: AssistantMessage | None = None
         provider_failure: ProviderFailed | None = None
         terminal_seen = False
-        for event in self.provider.stream(request, token):
+        for event in self._provider_events(request, token):
             token.checkpoint()
             if terminal_seen:
                 raise ProtocolError("provider emitted an event after its terminal event")
@@ -111,6 +114,15 @@ class Agent:
         if deltas and "".join(deltas) != completed.content:
             raise ProtocolError("streamed text does not match completed message")
         return completed
+
+    def _provider_events(self, request: ModelRequest, token: CancellationToken):
+        try:
+            yield from self.provider.stream(request, token)
+        except (Cancelled, DeadlineExceeded, ProtocolError):
+            raise
+        except Exception as error:
+            token.checkpoint()
+            raise RuntimeError(str(error)) from error
 
 
 class ProtocolError(RuntimeError):

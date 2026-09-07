@@ -98,6 +98,7 @@ class Agent:
                 reply = yield from self._stream_reply(token)
                 self.messages.append(reply)
                 yield AssistantCompleted(reply)
+                token.checkpoint()
                 if not reply.tool_calls:
                     yield AgentCompleted(reply.content)
                     return
@@ -112,6 +113,7 @@ class Agent:
                     self.messages.append(result)
                     yield ToolCompleted(result)
 
+            token.checkpoint()
             raise _BudgetError(f"agent exceeded {self.max_turns} turns")
         except CancellationRequested as error:
             yield AgentFailed("cancelled", str(error))
@@ -176,6 +178,7 @@ class Agent:
         except (CancellationRequested, DeadlineExceeded, _ProviderError, _ProtocolError):
             raise
         except Exception as error:
+            cancellation.checkpoint()
             raise _ProviderError(str(error)) from error
 
         cancellation.checkpoint()

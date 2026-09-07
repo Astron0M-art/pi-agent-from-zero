@@ -21,6 +21,7 @@ LESSON_ENTRIES = (
 )
 CODING_TOOL_ENTRIES = LESSON_ENTRIES[-2:]
 STREAMING_ENTRIES = LESSON_ENTRIES[2:]
+REGISTRY_ENTRIES = LESSON_ENTRIES[3:]
 
 
 def _run(entry: Path, transcript: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -368,6 +369,88 @@ def test_v03_and_later_deadline_wins_over_command_timeout(version: str, entry: P
 
     assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
     assert result.stdout.strip() == "timeout 0"
+
+
+@pytest.mark.parametrize(("version", "entry"), STREAMING_ENTRIES)
+def test_v03_and_later_normalize_provider_errors_and_final_deadline(
+    version: str, entry: Path
+) -> None:
+    constructor = (
+        "Agent(provider, ToolRegistry([]))"
+        if version != "v0.3"
+        else "Agent(provider, lambda _command: True)"
+    )
+    tools_import = "from tools import ToolRegistry\n" if version != "v0.3" else ""
+    program = (
+        "import time\n"
+        "from agent import Agent\n"
+        "from events import AgentCompleted, AssistantCompleted, CancellationToken, "
+        "ProviderCompleted\n"
+        "from messages import AssistantMessage\n"
+        "from providers import FakeModel\n"
+        f"{tools_import}"
+        "class RaisingProvider:\n"
+        "    def __init__(self, delay=0): self.delay = delay\n"
+        "    def stream(self, _request, _token):\n"
+        "        time.sleep(self.delay)\n"
+        "        raise ValueError('provider exploded')\n"
+        "provider = RaisingProvider()\n"
+        f"first = {constructor}\n"
+        "print(list(first.stream('bad'))[-1].kind)\n"
+        "provider = RaisingProvider(0.02)\n"
+        f"late = {constructor}\n"
+        "print(list(late.stream('late', cancellation=CancellationToken(0.001)))[-1].kind)\n"
+        "provider = FakeModel([[ProviderCompleted(AssistantMessage('done'))]])\n"
+        f"paused = {constructor}\n"
+        "events = paused.stream('pause', cancellation=CancellationToken(0.01))\n"
+        "seen = []\n"
+        "for event in events:\n"
+        "    seen.append(event)\n"
+        "    if isinstance(event, AssistantCompleted):\n"
+        "        time.sleep(0.02)\n"
+        "        break\n"
+        "seen.extend(events)\n"
+        "print(seen[-1].kind, sum(isinstance(event, AgentCompleted) for event in seen))\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=entry.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
+    assert result.stdout.splitlines() == ["provider", "timeout", "timeout 0"]
+
+
+@pytest.mark.parametrize(("version", "entry"), REGISTRY_ENTRIES)
+def test_v04_and_later_cancel_before_unknown_tool_lookup(version: str, entry: Path) -> None:
+    program = (
+        "from events import CancellationToken\n"
+        "from messages import ToolCall\n"
+        "from tools import ToolRegistry\n"
+        "token = CancellationToken()\n"
+        "token.cancel('stop')\n"
+        "try:\n"
+        "    ToolRegistry([]).execute(ToolCall('one', 'missing', {}), token)\n"
+        "except Exception as error:\n"
+        "    print(type(error).__name__)\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=entry.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
+    assert result.stdout.strip() == "Cancelled"
 
 
 @pytest.mark.parametrize(("version", "entry"), CODING_TOOL_ENTRIES)

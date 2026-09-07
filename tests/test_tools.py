@@ -154,6 +154,22 @@ def test_unknown_tool_keeps_call_identity() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    "call",
+    [
+        ToolCall("missing-1", "missing", {}),
+        ToolCall("invalid-1", "echo", {}),
+    ],
+)
+def test_cancelled_token_wins_over_early_registry_errors(call: ToolCall) -> None:
+    token = CancellationToken()
+    token.cancel("stop before lookup")
+    registry = ToolRegistry([Tool(definition(), lambda _arguments, _token: ToolOutcome("ok"))])
+
+    with pytest.raises(CancellationRequested, match="stop before lookup"):
+        registry.execute(call, token)
+
+
 def test_cancellation_is_not_downgraded_to_tool_error() -> None:
     def cancel(_arguments: Mapping[str, object], token: CancellationToken) -> ToolOutcome:
         token.cancel("stop the run")
