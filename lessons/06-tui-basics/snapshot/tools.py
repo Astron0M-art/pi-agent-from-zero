@@ -114,6 +114,7 @@ class ToolRegistry:
         try:
             token.checkpoint()
             outcome = tool.execute(arguments, token)
+            token.checkpoint()
             return ToolResultMessage(
                 call.id,
                 call.name,

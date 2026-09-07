@@ -281,6 +281,47 @@ def test_v03_and_later_preserve_cancellation_and_deadline(
     assert result.stdout.splitlines() == expected
 
 
+@pytest.mark.parametrize(("version", "entry"), STREAMING_ENTRIES)
+def test_v03_and_later_never_commit_bash_success_after_run_deadline(
+    version: str, entry: Path
+) -> None:
+    if version == "v0.3":
+        tools_import = ""
+        constructor = "Agent(fake, lambda _command: True)"
+    else:
+        tools_import = "from tools import ToolRegistry, create_bash_tool\n"
+        constructor = (
+            "Agent(fake, ToolRegistry([create_bash_tool(lambda _command: True, Path.cwd())]))"
+        )
+    program = (
+        "from pathlib import Path\n"
+        "from agent import Agent\n"
+        "from events import ProviderCompleted, ToolCompleted\n"
+        "from messages import AssistantMessage, ToolCall\n"
+        "from providers import FakeModel\n"
+        f"{tools_import}"
+        "reply = AssistantMessage(tool_calls=(ToolCall('bash-1', 'bash', "
+        "{'command': 'sleep 0.02'}),))\n"
+        "fake = FakeModel([[ProviderCompleted(reply)]])\n"
+        f"agent = {constructor}\n"
+        "events = list(agent.stream('late bash', "
+        "cancellation=__import__('events').CancellationToken(0.001)))\n"
+        "print(events[-1].kind, sum(isinstance(event, ToolCompleted) for event in events))\n"
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-c", program],
+        cwd=entry.parent,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, f"{version}: {result.stdout}\n{result.stderr}"
+    assert result.stdout.strip() == "timeout 0"
+
+
 @pytest.mark.parametrize(("version", "entry"), CODING_TOOL_ENTRIES)
 def test_v05_and_later_combine_chat_with_project_tools(
     version: str, entry: Path, tmp_path: Path

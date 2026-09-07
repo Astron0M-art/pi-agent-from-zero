@@ -65,7 +65,7 @@ class Agent:
                 for call in reply.tool_calls:
                     token.checkpoint()
                     yield ToolStarted(call)
-                    result = self._execute(call)
+                    result = self._execute(call, token)
                     self.messages.append(result)
                     yield ToolCompleted(result)
             yield AgentFailed("budget", f"agent exceeded {self.max_turns} turns")
@@ -112,12 +112,13 @@ class Agent:
             raise ProtocolError("streamed text does not match completed message")
         return completed
 
-    def _execute(self, call: ToolCall) -> ToolResultMessage:
+    def _execute(self, call: ToolCall, token: CancellationToken) -> ToolResultMessage:
         command = call.arguments.get("command")
         if call.name != "bash" or not isinstance(command, str):
             return ToolResultMessage(call.id, call.name, "invalid tool call", True)
         if not self.approve(command):
             return ToolResultMessage(call.id, call.name, "user denied command", True)
+        token.checkpoint()
         try:
             completed = subprocess.run(
                 ["bash", "-lc", command],
@@ -134,6 +135,7 @@ class Agent:
                 "command timed out after 5s",
                 True,
             )
+        token.checkpoint()
         output = completed.stdout + completed.stderr or "(no output)"
         return ToolResultMessage(call.id, call.name, output, completed.returncode != 0)
 

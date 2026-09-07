@@ -233,6 +233,7 @@ class ToolRegistry:
                 raise TypeError("tool handler must return ToolOutcome")
             if not isinstance(outcome.content, str) or not isinstance(outcome.is_error, bool):
                 raise TypeError("ToolOutcome must contain string content and bool is_error")
+            cancellation.checkpoint()
             return ToolResultMessage(
                 call.id,
                 call.name,

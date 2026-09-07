@@ -69,7 +69,7 @@ class StreamingAgentTests(unittest.TestCase):
         call = ToolCall("bash-1", "bash", {"command": "sleep 6"})
 
         with patch("agent.subprocess.run", side_effect=subprocess.TimeoutExpired("bash", 5)):
-            result = agent._execute(call)
+            result = agent._execute(call, CancellationToken())
 
         self.assertTrue(result.is_error)
         self.assertEqual(result.content, "command timed out after 5s")
